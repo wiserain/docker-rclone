@@ -1,0 +1,24 @@
+#!/usr/bin/with-contenv bash
+
+rclone_remote_path=$(printenv RCLONE_REMOTE_PATH | tr -d '"' | tr -d "'")
+
+rclone_mountpoint=$(if ! mountpoint -q /local; then echo /data; else echo /cloud; fi)
+
+rclone_mount_basic_opts="
+--config=/config/rclone.conf
+--uid=${PUID:-911}
+--gid=${PGID:-911}
+--cache-dir=/cache
+--cache-db-path=/cache
+--cache-chunk-path=/cache
+--log-level=${RCLONE_MOUNT_LOG_LEVEL:-INFO}
+--log-file=/log/rclone_mount.log
+--allow-other
+--umask=002
+"
+
+IFS=" " read -r -a rclone_mount_user_opts <<< "$RCLONE_MOUNT_USER_OPTS"
+
+mount_command="rclone mount ${rclone_remote_path} ${rclone_mountpoint} $(echo $rclone_mount_basic_opts) ${rclone_mount_user_opts[@]}"
+echo "executing => $mount_command"
+exec s6-setuidgid abc $mount_command

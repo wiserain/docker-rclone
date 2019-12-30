@@ -1,0 +1,61 @@
+version: '3.5'
+
+services:
+
+  rclone:
+    container_name: rclone
+    image: wiserain/rclone:testing
+    restart: always
+    networks:
+      - frontend
+    ports:
+      - "5572:5572"
+    build:
+      context: ${DOCKER_ROOT}/docker-rclone/.
+      dockerfile: Dockerfile
+      args:
+        MAKEFLAGS: "-j4"
+        APT_MIRROR: "mirror.kakao.com"
+    volumes:
+      - ${DOCKER_ROOT}/rclone/config:/config
+      - ${DOCKER_ROOT}/rclone/log:/log
+      - ${RCLONE_CACHE}:/cache
+      - ${LOCAL_MEDIA}:/local
+      - ${CLOUD_MEDIA}:/cloud:shared
+      - ${UNION_MEDIA}:/data:shared
+    privileged: true
+    devices:
+      - /dev/fuse
+    cap_add:
+      - MKNOD
+      - SYS_ADMIN
+    environment:
+      - TZ=Asia/Seoul
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - RCLONE_REMOTE_PATH="${RCLONE_REMOTE_PATH}"
+      - RCLONE_MOUNT_LOG_LEVEL=INFO
+      - RCLONE_MOUNT_USER_OPTS=
+        --attr-timeout 48h
+        --dir-cache-time 48h
+        --buffer-size 128M
+        --poll-interval 15s
+        --drive-skip-gdocs
+        --timeout 1h
+        --vfs-read-chunk-size=64M
+        --vfs-cache-mode=writes
+        --rc
+        --rc-addr 127.0.0.1:5572
+      - MOVE_LOCAL_ALL=true
+      - KEEP_EMPTY_DIRS=1
+      - POOLING_FS=mergerfs
+      - RCLONE_FAST_LIST=true
+      
+networks:
+  frontend:
+    name: frontend
+    driver: bridge
+
+  backend:
+    name: backend
+    driver: bridge

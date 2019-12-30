@@ -1,0 +1,17 @@
+#!/usr/bin/with-contenv bash
+
+# make folders
+mkdir -p /config /cache /log /cloud /data /local
+
+# permissions
+chown -R abc:abc /config /cache /log /cloud /data
+chmod a+x /usr/bin/rclone_*
+chmod a+x /usr/bin/*_local*
+
+# crontab
+env >> /etc/environment
+if [ -f /config/crontab ]; then
+    cat /config/crontab | crontab -u root -
+else
+    printf "${COPY_LOCAL_SCHEDULE} cd / && copy_local 2>&1\n${MOVE_LOCAL_SCHEDULE} cd / && move_local 2>&1\n" | crontab -u root -
+fi

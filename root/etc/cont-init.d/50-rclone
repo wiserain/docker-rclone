@@ -1,0 +1,28 @@
+#!/usr/bin/with-contenv bash
+
+echo "*** checking rclone.conf"
+while [ ! -f "/config/rclone.conf" ]; do
+	echo "Waiting for rclone configuration file in /config/rclone.conf. Retrying in 30s ..."
+	echo "RUN: docker exec -it <DOCKER_CONTAINER> rclone_setup"
+	sleep 30
+done
+
+echo "*** checking rclone remote path"
+rclone_remote_path=$(printenv RCLONE_REMOTE_PATH | tr -d '"' | tr -d "'")
+if [[ ! "${rclone_remote_path}" == *:* ]]; then
+	echo "ERROR: Missing colon (:) in RCLONE_REMOTE_PATH (${rclone_remote_path})"
+	exit 1
+fi
+rclone_remote="$(echo $rclone_remote_path | cut -d : -f 1):"
+if [ "$(rclone listremotes --config /config/rclone.conf | grep "${rclone_remote}" | wc -l)" == "0" ]; then
+	echo "ERROR: Invalid rclone remote name (${rclone_remote})"
+	echo "ERROR: Available rclone remotes ($(echo $(rclone listremotes --config /config/rclone.conf) | tr -d '\r'))"
+	exit 1
+fi
+
+echo "*** checking rclone mountpoint"
+rclone_mountpoint=$(if ! mountpoint -q /local; then echo /data; else echo /cloud; fi)
+if [ $(findmnt ${rclone_mountpoint} | grep fuse.rclone | wc -l) != "0" ]; then
+	echo "ERROR: rclone mountpoint (${rclone_mountpoint}) already mounted"
+	exit 1
+fi

@@ -1,0 +1,5 @@
+#!/usr/bin/with-contenv bash
+
+# unmount fuse
+fusermount -uz /data
+fusermount -uz /cloud
