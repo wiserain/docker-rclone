@@ -6,11 +6,13 @@ ARG APT_MIRROR="archive.ubuntu.com"
 
 ARG RCLONE_VER="current"
 
-# s6 environment settings
+# environment settings - s6
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_KEEP_ENV=1
 
+# environment settings - container-level
 ENV LANG=C.UTF-8
+ENV PS1="\u@\h:\w\\$ "
 
 # install packages
 RUN \
@@ -66,20 +68,20 @@ RUN \
 # add local files
 COPY root/ /
 
-# cron - disabled by default
-ENV COPY_LOCAL_SCHEDULE "0 0 31 2 0"
-ENV MOVE_LOCAL_SCHEDULE "0 0 31 2 0"
+# environment settings - rclone
+ENV RCLONE_CONFIG=/config/rclone.conf
 
-# default mount options
+# environment settings - pooling fs
 ENV POOLING_FS "mergerfs"
 ENV UFS_USER_OPTS "cow,direct_io,nonempty,auto_cache,sync_read"
 ENV MFS_USER_OPTS "rw,async_read=false,use_ino,allow_other,func.getattr=newest,category.action=all,category.create=ff,cache.files=partial,dropcacheonclose=true"
 
-# others
-# ENV DATE_FORMAT "+%F@%T"
+# environment settings - scripts
+ENV COPY_LOCAL_SCHEDULE "0 0 31 2 0"
+ENV MOVE_LOCAL_SCHEDULE "0 0 31 2 0"
+
+# environment settings - others
 ENV DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
-ENV RCLONE_CONFIG=/config/rclone.conf
-ENV PS1="\u@\h:\w\\$ "
 
 VOLUME /config /cache /log /cloud /data
 WORKDIR /data

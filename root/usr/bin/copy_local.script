@@ -60,7 +60,6 @@ while read -r n; do
 	done
 
 	fileSize=$(stat "$n" -c %s)
-	echo $RCLONE_CHECKERS
 
 	# Copy file to remote destination[s], retaining path
 	rclone copy --config=/config/rclone.conf "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
