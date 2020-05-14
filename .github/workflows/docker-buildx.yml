@@ -23,18 +23,6 @@ jobs:
         uses: actions/checkout@v2
       - 
         name: Run Buildx
-        env:
-          IMAGE_NAME: ${{ steps.vars.outputs.dockerhub_user }}/${{ steps.vars.outputs.dockerhub_repo }}
-        run: |
-          docker buildx build \
-            --output "type=image,push=true" \
-            --platform ${{ steps.vars.outputs.buildx_platforms }} \
-            --tag "${IMAGE_NAME}:${{ steps.vars.outputs.version }}" \
-            --tag "${IMAGE_NAME}:latest" \
-            --file Dockerfile . \
-            --build-arg "RCLONE_VER=${{ steps.vars.outputs.version }}"
-      - 
-        name: Run Buildx
         uses: ilteoood/docker_buildx@master
         with:
           imageName: ${{ env.DOCKERHUB_USER }}/${{ env.DOCKERHUB_REPO }}
