@@ -72,6 +72,8 @@ RUN \
 # add local files
 COPY root/ /
 
+RUN chmod a+x /healthcheck.sh
+
 # environment settings - rclone
 ENV RCLONE_CONFIG=/config/rclone.conf
 
@@ -89,6 +91,8 @@ ENV DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
 
 VOLUME /config /cache /log /cloud /data
 WORKDIR /data
+
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 CMD /healthcheck.sh
 
 ENTRYPOINT ["/init"]
 CMD cron -f
