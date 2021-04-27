@@ -19,7 +19,7 @@ ENV PS1="\u@\h:\w\\$ "
 # install packages
 RUN \
   echo "**** apt source change for local build ****" && \
-  sed -i "s/archive.ubuntu.com/\"$APT_MIRROR\"/g" /etc/apt/sources.list && \
+  sed -i "s/archive.ubuntu.com/$APT_MIRROR/g" /etc/apt/sources.list && \
   echo "**** install runtime packages ****" && \
   apt-get update && \
   apt-get install -yq --no-install-recommends apt-utils && \
