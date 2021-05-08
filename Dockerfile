@@ -89,7 +89,7 @@ ENV MOVE_LOCAL_SCHEDULE "0 0 31 2 0"
 # environment settings - others
 ENV DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
 
-VOLUME /config /cache /log /cloud /data
+VOLUME /config /cache /log /cloud /data /local
 WORKDIR /data
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 CMD /healthcheck.sh

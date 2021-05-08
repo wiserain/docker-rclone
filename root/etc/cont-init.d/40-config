@@ -5,6 +5,7 @@ mkdir -p /config /cache /log /cloud /data /local
 
 # permissions
 chown -R abc:abc /config /cache /log /cloud /data
+chown abc:abc /local
 chmod a+x /usr/bin/rclone_*
 chmod a+x /usr/bin/*_local*
 
