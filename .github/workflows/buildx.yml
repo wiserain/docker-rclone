@@ -79,7 +79,7 @@ jobs:
           push: true
       -
         name: Update Dockerhub description
-        uses: peter-evans/dockerhub-description@v2
+        uses: peter-evans/dockerhub-description@v2.4.2
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASS }}
