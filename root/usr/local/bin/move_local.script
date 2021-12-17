@@ -1,15 +1,19 @@
 #!/bin/bash
 
+logf() {
+    echo "[ $(date "$(printenv DATE_FORMAT)") ] $1"
+}
+
 # If script is already running; abort.
 if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
-	echo "[ $(date $(printenv DATE_FORMAT)) ] Moving already in progress. Aborting!"
+	logf "Moving already in progress. Aborting!"
 	exit 3
 fi
 
 # Check if any files exist, if not exit
 file_ct=$(find /local -type f | wc -l)
 if [ "$file_ct" = 0 ];then
-	# echo "[ $(date $(printenv DATE_FORMAT)) ] Nothing to move. Exiting."
+	# logf "Nothing to move. Exiting."
 	exit 3
 fi
 
@@ -22,7 +26,7 @@ pCount=0
 rclone_remote_path=$(printenv RCLONE_REMOTE_PATH | tr -d '"' | tr -d "'")
 prune_paths=$(find /local -name .nomove -printf "-path %h -o ")
 
-# echo "[ $(date $(printenv DATE_FORMAT)) ] ###### Starting rclone move ######"
+# logf "###### Starting rclone move ######"
 
 # move old files first
 if [[ ${MOVE_LOCAL_AFTER_DAYS} =~ ^[0-9]+$ ]]; then
@@ -51,18 +55,18 @@ if [[ ${MOVE_LOCAL_AFTER_DAYS} =~ ^[0-9]+$ ]]; then
 		while [ "$(lsof "$n" >/dev/null 2>&1)" ] || \
 			[ "$(lsof "/local/${n}" >/dev/null 2>&1)" ] || \
 			[ "$(lsof "/data/${n}" >/dev/null 2>&1)" ]; do
-			echo "[ $(date $(printenv DATE_FORMAT)) ] File -> ${n} in use. Retrying in 10 seconds ..."
+			logf "File -> ${n} in use. Retrying in 10 seconds ..."
 			sleep 10
 		done
 
 		fileSize=$(stat "$n" -c %s)
 
 		# Move file to remote destination[s], retaining path
-		rclone move --config=/config/rclone.conf "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
+		rclone move "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			pSize=$((pSize + fileSize))
 			pCount=$((pCount + 1))
-			echo "[ $(date $(printenv DATE_FORMAT)) ] +${MOVE_LOCAL_AFTER_DAYS}D $basefile ($(humanReadableSize $fileSize))"
+			logf "+${MOVE_LOCAL_AFTER_DAYS}D $basefile ($(humanReadableSize $fileSize))"
 		fi
 	done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -mtime +$MOVE_LOCAL_AFTER_DAYS -print)
 fi
@@ -72,7 +76,7 @@ if [[ ${MOVE_LOCAL_EXCEEDS_GB} =~ ^[0-9]+$ ]] && [[ ${MOVE_LOCAL_FREEUP_GB} =~ ^
 	maxSize=$(($MOVE_LOCAL_EXCEEDS_GB * 1000 * 1000 * 1000))
 	currentSize="$(du -sb /local | awk '{print $1}')"
 	if [ "$maxSize" -gt "$currentSize" ]; then
-		# echo "[ $(date $(printenv DATE_FORMAT)) ] Current size of $(($currentSize / 1000 / 1000 / 1000)) GB has not exceeded $MOVE_LOCAL_EXCEEDS_GB GB"
+		# logf "Current size of $(($currentSize / 1000 / 1000 / 1000)) GB has not exceeded $MOVE_LOCAL_EXCEEDS_GB GB"
 		:
 	else
 		freeupSize=$(($MOVE_LOCAL_FREEUP_GB * 1000 * 1000 * 1000))
@@ -109,7 +113,7 @@ if [[ ${MOVE_LOCAL_EXCEEDS_GB} =~ ^[0-9]+$ ]] && [[ ${MOVE_LOCAL_FREEUP_GB} =~ ^
 			while [ "$(lsof "$n" >/dev/null 2>&1)" ] || \
 				[ "$(lsof "/local/${n}" >/dev/null 2>&1)" ] || \
 				[ "$(lsof "/data/${n}" >/dev/null 2>&1)" ]; do
-				echo "[ $(date $(printenv DATE_FORMAT)) ] File -> ${n} in use. Retrying in 10 seconds ..."
+				logf "File -> ${n} in use. Retrying in 10 seconds ..."
 				sleep 10
 			done
 
@@ -120,7 +124,7 @@ if [[ ${MOVE_LOCAL_EXCEEDS_GB} =~ ^[0-9]+$ ]] && [[ ${MOVE_LOCAL_FREEUP_GB} =~ ^
 			if [ $? -eq 0 ]; then
 				pSize=$((pSize + fileSize))
 				pCount=$((pCount + 1))
-				echo "[ $(date $(printenv DATE_FORMAT)) ] +${MOVE_LOCAL_EXCEEDS_GB}GB $basefile ($(humanReadableSize $fileSize))"
+				logf "+${MOVE_LOCAL_EXCEEDS_GB}GB $basefile ($(humanReadableSize $fileSize))"
 			fi
 		done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print0 | xargs -0 --no-run-if-empty stat --format '%Y :%y %n' | sort -n | cut -d: -f2- | awk '{$1=$2=$3=""; print $0}')
 	fi
@@ -154,7 +158,7 @@ if [ "${MOVE_LOCAL_ALL}" == "true" ]; then
 		while [ "$(lsof "$n" >/dev/null 2>&1)" ] || \
 			[ "$(lsof "/local/${n}" >/dev/null 2>&1)" ] || \
 			[ "$(lsof "/data/${n}" >/dev/null 2>&1)" ]; do
-			echo "[ $(date $(printenv DATE_FORMAT)) ] File -> ${n} in use. Retrying in 10 seconds ..."
+			logf "File -> ${n} in use. Retrying in 10 seconds ..."
 			sleep 10
 		done
 
@@ -165,7 +169,7 @@ if [ "${MOVE_LOCAL_ALL}" == "true" ]; then
 		if [ $? -eq 0 ]; then
 			pSize=$((pSize + fileSize))
 			pCount=$((pCount + 1))
-			echo "[ $(date $(printenv DATE_FORMAT)) ] $basefile ($(humanReadableSize $fileSize))"
+			logf "$basefile ($(humanReadableSize $fileSize))"
 		fi
 	done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print)
 fi
@@ -177,8 +181,8 @@ fi
 
 # final report
 if [[ "${pCount}" -gt "0" ]]; then
-	echo "[ $(date $(printenv DATE_FORMAT)) ] ###### Total $(humanReadableSize $pSize) of $pCount file(s) moved ######"
+	logf "###### Total $(humanReadableSize $pSize) of $pCount file(s) moved ######"
 fi
-# echo "[ $(date $(printenv DATE_FORMAT)) ] ###### rclone move finished successfully ######"
+# logf "###### rclone move finished successfully ######"
 
 exit 0

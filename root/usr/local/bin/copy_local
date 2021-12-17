@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# su abc -s "/bin/bash" -m -c \
+#     "copy_local.script $@ 2>&1 | tee -a /log/copy_local.log"
+exec s6-setuidgid abc \
+    copy_local.script $@ 2>&1 | tee -a /log/copy_local.log

@@ -1,3 +1,18 @@
+FROM golang:1.16-bullseye AS builder
+
+ARG GO_CRON_VERSION=0.0.4
+ARG GO_CRON_SHA256=6c8ac52637150e9c7ee88f43e29e158e96470a3aaa3fcf47fd33771a8a76d959
+
+RUN \
+  echo "**** build go-cron v${GO_CRON_VERSION} ****" && \
+  curl -sL -o go-cron.tar.gz https://github.com/djmaze/go-cron/archive/v${GO_CRON_VERSION}.tar.gz && \
+  echo "${GO_CRON_SHA256}  go-cron.tar.gz" | sha256sum -c - && \
+  tar xzf go-cron.tar.gz && \
+  cd go-cron-${GO_CRON_VERSION} && \
+  go build && \
+  mv go-cron /usr/local/bin/go-cron
+
+
 FROM ubuntu:20.04
 LABEL maintainer="wiserain"
 LABEL org.opencontainers.image.source https://github.com/wiserain/docker-rclone
@@ -5,16 +20,8 @@ LABEL org.opencontainers.image.source https://github.com/wiserain/docker-rclone
 ARG DEBIAN_FRONTEND="noninteractive"
 ARG APT_MIRROR="archive.ubuntu.com"
 
-ARG RCLONE_VER="current"
+ARG RCLONE_TYPE="latest"
 ARG TARGETARCH
-
-# environment settings - s6
-ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
-ENV S6_KEEP_ENV=1
-
-# environment settings - container-level
-ENV LANG=C.UTF-8
-ENV PS1="\u@\h:\w\\$ "
 
 # install packages
 RUN \
@@ -24,14 +31,14 @@ RUN \
   apt-get update && \
   apt-get install -yq --no-install-recommends apt-utils && \
   apt-get install -yq --no-install-recommends \
+    bc \
     ca-certificates \
-    cron \
     fuse \
+    jq \
     lsof \
     openssl \
     tzdata \
-    unionfs-fuse \
-    vim && \
+    unionfs-fuse && \
   update-ca-certificates && \
   sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
   echo "**** install build packages ****" && \
@@ -44,21 +51,17 @@ RUN \
   curl -o /tmp/s6-overlay.tar.gz -L "https://github.com/just-containers/s6-overlay/releases/download/${OVERLAY_VERSION}/s6-overlay-${OVERLAY_ARCH}.tar.gz" && \
   tar xzf /tmp/s6-overlay.tar.gz -C / --exclude='./bin' && tar xzf /tmp/s6-overlay.tar.gz -C /usr ./bin && \
   echo "**** add rclone ****" && \
-  cd $(mktemp -d) && \
-  if [ "${RCLONE_VER}" = "current" ]; then \
-  curl -LJO https://downloads.rclone.org/rclone-current-linux-$TARGETARCH.zip; else \
-  curl -LJO "https://github.com/ncw/rclone/releases/download/v${RCLONE_VER}/rclone-v${RCLONE_VER}-linux-$TARGETARCH.zip"; fi && \
-  unzip "rclone-*-linux-$TARGETARCH.zip" && \
-  mv rclone-*-linux-$TARGETARCH/rclone /usr/bin/ && \
-  chmod 755 /usr/bin/rclone && \
+  if [ "${RCLONE_TYPE}" = "latest" ]; then \
+    rclone_install_script_url="https://rclone.org/install.sh"; \
+  elif [ "${RCLONE_TYPE}" = "mod" ]; then \
+    rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"; fi && \
+  curl -fsSL $rclone_install_script_url | bash && \
   echo "**** add mergerfs ****" && \
   MFS_VERSION=$(curl -sX GET "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | awk '/tag_name/{print $4;exit}' FS='[""]') && \
-  MFS_ARCH=$(if [ "$TARGETARCH" = "arm" ]; then echo "armhf"; else echo "$TARGETARCH"; fi) && \
-  MFS_DEB="mergerfs_${MFS_VERSION}.ubuntu-focal_${MFS_ARCH}.deb" && \
+  MFS_DEB="mergerfs_${MFS_VERSION}.ubuntu-focal_$(dpkg --print-architecture).deb" && \
   cd $(mktemp -d) && curl -LJO "https://github.com/trapexit/mergerfs/releases/download/${MFS_VERSION}/${MFS_DEB}" && \
   dpkg -i ${MFS_DEB} && \
   echo "**** create abc user ****" && \
-  groupmod -g 1000 users && \
   useradd -u 911 -U -d /config -s /bin/false abc && \
   usermod -G users abc && \
   echo "**** cleanup ****" && \
@@ -69,30 +72,32 @@ RUN \
   apt-get autoremove -y && \
   rm -rf /tmp/* /var/lib/{apt,dpkg,cache,log}/
 
+# add build artifacts
+COPY --from=builder /usr/local/bin/* /usr/local/bin/
+
+ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/20-install-pkg /etc/cont-init.d/20-install-pkg
+ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/30-wait-for-mnt /etc/cont-init.d/30-wait-for-mnt
+
 # add local files
 COPY root/ /
 
-RUN chmod a+x /healthcheck.sh
+RUN chmod a+x \
+  /usr/local/bin/*
 
-# environment settings - rclone
-ENV RCLONE_CONFIG=/config/rclone.conf
-
-# environment settings - pooling fs
-ENV POOLING_FS "mergerfs"
-ENV UFS_USER_OPTS "cow,direct_io,nonempty,auto_cache,sync_read"
-ENV MFS_USER_OPTS "rw,async_read=false,use_ino,allow_other,func.getattr=newest,category.action=all,category.create=ff,cache.files=partial,dropcacheonclose=true"
-
-# environment settings - scripts
-ENV COPY_LOCAL_SCHEDULE "0 0 31 2 0"
-ENV MOVE_LOCAL_SCHEDULE "0 0 31 2 0"
-
-# environment settings - others
-ENV DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
+# environment settings
+ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+    S6_KEEP_ENV=1 \
+    LANG=C.UTF-8 \
+    PS1="\u@\h:\w\\$ " \
+    RCLONE_CONFIG=/config/rclone.conf \
+    RCLONE_REFRESH_METHOD=default \
+    UFS_USER_OPTS="cow,direct_io,nonempty,auto_cache,sync_read" \
+    MFS_USER_OPTS="rw,use_ino,func.getattr=newest,category.action=all,category.create=ff,cache.files=auto-full,dropcacheonclose=true" \
+    DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
 
 VOLUME /config /cache /log /cloud /data /local
 WORKDIR /data
 
-HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 CMD /healthcheck.sh
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 CMD healthcheck.sh
 
 ENTRYPOINT ["/init"]
-CMD cron -f

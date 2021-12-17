@@ -1,0 +1,76 @@
+#!/usr/bin/with-contenv bash
+
+logf() {
+    echo "$(date "$(printenv DATE_FORMAT)") $1"
+}
+
+# If script is already running; abort.
+if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
+	logf "Refresh already in progress. Aborting!"
+	exit 3
+fi
+
+refresh_cmd_base="rclone rc vfs/refresh --rc-addr 127.0.0.1:5574 --fast-list --timeout 300m"
+
+do_refresh() {
+    $refresh_cmd_base "$@" | jq -r '.result | keys[] as $k | $k + ":" + .[$k]' | \
+        while IFS=: read -r dir result; do
+            logf "\"${dir}\": $result"
+        done
+}
+
+do_refresh_dir() {
+    dirlist=("${1}")
+    while true; do
+        if [ "${dirlist[-1]}" == "." ] || [ "${dirlist[-1]}" == "/" ]; then break; fi
+        dirlist+=("$(dirname "${dirlist[-1]}")")
+    done
+    for i in $(echo "${!dirlist[@]}" | rev); do
+        if [ "${dirlist[i]}" == "." ] || [ "${dirlist[i]}" == "/" ]; then
+            do_refresh 2>&1 >/dev/null
+        elif [ "$i" = "0" ]; then
+            do_refresh "dir=${dirlist[i]}" "recursive=true"
+        else
+            do_refresh "dir=${dirlist[i]}" 2>&1 >/dev/null
+        fi
+    done
+}
+
+if [[ $# -lt 1 ]]; then
+    exit 0
+fi
+
+# 
+# main
+# 
+logf ">>> refreshing \"$1\""
+stime=$(date +%s)
+IFS="|" read -r -a RDIRS <<< "$1"
+
+if [ "${RCLONE_REFRESH_METHOD}" == "default" ]; then
+    # method 1: multiple dirs passed at once
+    count=0
+    dirs=()
+    for RDIR in "${RDIRS[@]}"; do
+        count=$(($count+1))
+        dirs+=("dir$count=$RDIR")
+    done
+    dirs+=("recursive=true")
+    do_refresh "${dirs[@]}"
+else
+    for RDIR in "${RDIRS[@]}"; do
+        if [ "${RCLONE_REFRESH_METHOD}" == "individual" ]; then
+            # method 2: for each dir, one bye one
+            do_refresh "dir=$RDIR" "recursive=true"
+        elif [ "${RCLONE_REFRESH_METHOD}" == "progressive" ]; then
+            # method 3: for each dir, one bye one and progressively
+            do_refresh_dir "$RDIR"
+        fi
+    done
+fi
+
+etime=$(echo "$(date +%s) - $stime" | bc -l)
+hh=$((etime / 3600))
+mm=$(((etime % 3600) / 60))
+ss=$(((etime % 3600) % 60))
+logf "<<< done in $(printf "%02d:%02d:%02d\n" "$hh" "$mm" "$ss")"

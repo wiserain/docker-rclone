@@ -1,15 +1,19 @@
 #!/bin/bash
 
+logf() {
+    echo "[ $(date "$(printenv DATE_FORMAT)") ] $1"
+}
+
 # If script is already running; abort.
 if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
-	echo "[ $(date $(printenv DATE_FORMAT)) ] Copying already in progress. Aborting!"
+	logf "Copying already in progress. Aborting!"
 	exit 3
 fi
 
 # Check if any files exist, if not exit
 file_ct=$(find /local -type f | wc -l)
 if [ "$file_ct" = 0 ];then
-	# echo "[ $(date $(printenv DATE_FORMAT)) ] Nothing to copy. Exiting."
+	# logf "Nothing to copy. Exiting."
 	exit 3
 fi
 
@@ -22,7 +26,7 @@ pCount=0
 rclone_remote_path=$(printenv RCLONE_REMOTE_PATH | tr -d '"' | tr -d "'")
 prune_paths=$(find /local -name .nocopy -printf "-path %h -o ")
 
-# echo "[ $(date $(printenv DATE_FORMAT)) ] ###### Starting rclone copy ######"
+# logf "###### Starting rclone copy ######"
 
 # Generate filelist and iterate through it...
 while read -r n; do
@@ -55,25 +59,25 @@ while read -r n; do
 	while [ "$(lsof "$n" >/dev/null 2>&1)" ] || \
 		[ "$(lsof "/local/${n}" >/dev/null 2>&1)" ] || \
 		[ "$(lsof "/data/${n}" >/dev/null 2>&1)" ]; do
-		echo "[ $(date $(printenv DATE_FORMAT)) ] File -> ${n} in use. Retrying in 10 seconds ..."
+		logf "File -> ${n} in use. Retrying in 10 seconds ..."
 		sleep 10
 	done
 
 	fileSize=$(stat "$n" -c %s)
 
 	# Copy file to remote destination[s], retaining path
-	rclone copy --config=/config/rclone.conf "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
+	rclone copy "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
 	if [ $? -eq 0 ]; then
 		pSize=$((pSize + fileSize))
 		pCount=$((pCount + 1))
-		echo "[ $(date $(printenv DATE_FORMAT)) ] $basefile ($(humanReadableSize $fileSize))"
+		logf "$basefile ($(humanReadableSize $fileSize))"
 	fi
 done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print0 | xargs -0 --no-run-if-empty stat --format '%Y :%y %n' | sort -nr | cut -d: -f2- | awk '{$1=$2=$3=""; print $0}')
 
 # final report
 if [[ "${pCount}" -gt "0" ]]; then
-	echo "[ $(date $(printenv DATE_FORMAT)) ] ###### Total $(humanReadableSize $pSize) of $pCount file(s) copied ######"
+	logf "###### Total $(humanReadableSize $pSize) of $pCount file(s) copied ######"
 fi
-# echo "[ $(date $(printenv DATE_FORMAT)) ] ###### rclone copy finished successfully ######"
+# logf "###### rclone copy finished successfully ######"
 
 exit 0

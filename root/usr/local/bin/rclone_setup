@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv bash
+
+# su abc -s "/bin/sh" -c "rclone config"
+exec s6-setuidgid abc rclone config

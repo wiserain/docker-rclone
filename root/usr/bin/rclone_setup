@@ -1,3 +1,0 @@
-#!/bin/bash
-
-su abc -s "/bin/sh" -c "rclone config --config=/config/rclone.conf"

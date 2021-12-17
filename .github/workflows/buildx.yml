@@ -18,6 +18,9 @@ jobs:
   buildx:
     runs-on: ubuntu-20.04
     if: github.event_name != 'pull_request' && (github.event_name != 'watch' || github.actor == github.event.repository.owner.login)
+    strategy:
+      matrix:
+        rclone-type: [latest, mod]
     steps:
       -
         name: Checkout
@@ -36,6 +39,8 @@ jobs:
           file: Dockerfile
           tags: ${{ env.IMAGE_NAME }}:testing
           platforms: linux/amd64,linux/arm/v7,linux/arm64
+          build-args: |
+            RCLONE_TYPE=${{ matrix.rclone-type }}
       - 
         name: Load Built Image and Get Variables
         id: vars
@@ -43,6 +48,7 @@ jobs:
           docker buildx build \
             -t ${{ env.IMAGE_NAME }}:testing \
             --platform=linux/amd64 \
+            --build-arg RCLONE_TYPE=${{ matrix.rclone-type }} \
             --load \
             .
           CID=$(docker run -d ${{ env.IMAGE_NAME }}:testing)
@@ -71,11 +77,13 @@ jobs:
           context: .
           file: Dockerfile
           tags: |
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
             ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
-            ghcr.io/${{ env.IMAGE_NAME }}:latest
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
           platforms: linux/amd64,linux/arm/v7,linux/arm64
+          build-args: |
+            RCLONE_TYPE=${{ matrix.rclone-type }}
           push: true
       -
         name: Update Dockerhub description
@@ -93,14 +101,17 @@ jobs:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: ${{ job.status }}
           description: |
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
             ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
-            ghcr.io/${{ env.IMAGE_NAME }}:latest
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
 
   buildx-on-pr:
     runs-on: ubuntu-20.04
     if: github.event_name == 'pull_request' && (github.event_name != 'watch' || github.actor == github.event.repository.owner.login)
+    strategy:
+      matrix:
+        rclone-type: [latest, mod]
     steps:
       -
         name: Checkout
@@ -119,6 +130,8 @@ jobs:
           file: Dockerfile
           tags: ${{ env.IMAGE_NAME }}:testing
           platforms: linux/amd64,linux/arm/v7,linux/arm64
+          build-args: |
+            RCLONE_TYPE=${{ matrix.rclone-type }}
       - 
         name: Load Built Image and Get Variables
         id: vars
@@ -126,6 +139,7 @@ jobs:
           docker buildx build \
             -t ${{ env.IMAGE_NAME }}:testing \
             --platform=linux/amd64 \
+            --build-arg RCLONE_TYPE=${{ matrix.rclone-type }} \
             --load \
             .
           CID=$(docker run -d ${{ env.IMAGE_NAME }}:testing)
@@ -154,10 +168,10 @@ jobs:
           context: .
           file: Dockerfile
           tags: |
-            ${{ env.IMAGE_NAME }}:testing
-            ${{ env.IMAGE_NAME }}:testing-pr-${{ github.event.pull_request.number }}
-            ghcr.io/${{ env.IMAGE_NAME }}:testing
-            ghcr.io/${{ env.IMAGE_NAME }}:testing-pr-${{ github.event.pull_request.number }}
+            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
+            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
+            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
+            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           push: true
       -
@@ -168,7 +182,7 @@ jobs:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: ${{ job.status }}
           description: |
-            ${{ env.IMAGE_NAME }}:testing
-            ${{ env.IMAGE_NAME }}:testing-pr-${{ github.event.pull_request.number }}
-            ghcr.io/${{ env.IMAGE_NAME }}:testing
-            ghcr.io/${{ env.IMAGE_NAME }}:testing-pr-${{ github.event.pull_request.number }}
+            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
+            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
+            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
+            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}

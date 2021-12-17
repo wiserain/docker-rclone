@@ -1,0 +1,21 @@
+#!/usr/bin/with-contenv bash
+
+[[ -n "${POOLING_FS:-}" ]] && rclone_mountpoint="/cloud" || rclone_mountpoint="/data"
+
+rclone_mount_basic_opts="
+--uid=${PUID:-911}
+--gid=${PGID:-911}
+--cache-dir=/cache
+--use-mmap
+--allow-other
+--umask=002
+--rc
+--rc-no-auth
+--rc-addr=:5574
+"
+
+mfs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
+mfs_branches="/local=RW:/cloud=NC"
+
+ufs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
+ufs_branches="/local=RW:/cloud=RO"

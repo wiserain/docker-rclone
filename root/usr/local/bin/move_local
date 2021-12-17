@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# su abc -s "/bin/bash" -m -c \
+#     "move_local.script $@ 2>&1 | tee -a /log/move_local.log"
+exec s6-setuidgid abc \
+    move_local.script $@ 2>&1 | tee -a /log/move_local.log

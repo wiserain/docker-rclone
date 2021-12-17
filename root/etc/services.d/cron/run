@@ -1,0 +1,41 @@
+#!/usr/bin/with-contenv bash
+
+s6-svwait -U /var/run/s6/services/rclone
+
+if [[ -n "${COPY_LOCAL_SCHEDULE:-}" ]]; then
+    echo "*** scheduling job: copy_local"
+    echo "WARNING: env COPY_LOCAL_SCHEDULE deprecated. Use COPY_LOCAL_CRON instead!"
+    go-cron "$COPY_LOCAL_SCHEDULE" /usr/local/bin/copy_local &
+    sleep 1
+fi
+
+if [[ -n "${COPY_LOCAL_CRON:-}" ]]; then
+    echo "*** scheduling job: copy_local"
+    go-cron "$COPY_LOCAL_CRON" /usr/local/bin/copy_local &
+    sleep 1
+fi
+
+if [[ -n "${MOVE_LOCAL_SCHEDULE:-}" ]]; then
+    echo "*** scheduling job: move_local"
+    echo "WARNING: env MOVE_LOCAL_SCHEDULE deprecated. Use MOVE_LOCAL_CRON instead!"
+    go-cron "$MOVE_LOCAL_SCHEDULE" /usr/local/bin/move_local &
+    sleep 1
+fi
+
+if [[ -n "${MOVE_LOCAL_CRON:-}" ]]; then
+    echo "*** scheduling job: move_local"
+    go-cron "$MOVE_LOCAL_CRON" /usr/local/bin/move_local &
+    sleep 1
+fi
+
+# any ENVs starting with RCLONE_REFRESH_CRON
+for cron in "${!RCLONE_REFRESH_CRON@}"; do
+    dirs="RCLONE_REFRESH_DIRS${cron//RCLONE_REFRESH_CRON/}"
+    if [[ -n "${!cron}" ]] && [[ -n "${!dirs}" ]]; then
+        echo "*** scheduling job: vfs/refresh for '${!dirs}'"
+        go-cron "${!cron}" /usr/local/bin/rclone_refresh "${!dirs}" &
+        sleep 1
+    fi
+done
+
+wait
