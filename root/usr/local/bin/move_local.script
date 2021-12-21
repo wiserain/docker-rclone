@@ -1,12 +1,12 @@
 #!/bin/bash
 
 logf() {
-    echo "[ $(date "$(printenv DATE_FORMAT)") ] $1"
+    echo "$(date "$(printenv DATE_FORMAT)") MOVELO: $1"
 }
 
 # If script is already running; abort.
 if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
-	logf "Moving already in progress. Aborting!"
+	logf "Already in progress. Aborting!"
 	exit 3
 fi
 
