@@ -86,7 +86,9 @@ RUN chmod a+x \
 
 # environment settings
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
-    S6_KEEP_ENV=1 \
+    S6_KILL_FINISH_MAXTIME=7000 \
+    S6_SERVICES_GRACETIM=5000 \
+    S6_KILL_GRACETIME=5000 \
     LANG=C.UTF-8 \
     PS1="\u@\h:\w\\$ " \
     RCLONE_CONFIG=/config/rclone.conf \
