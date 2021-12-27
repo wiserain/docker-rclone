@@ -3,6 +3,8 @@ FROM golang:1.16-bullseye AS builder
 ARG GO_CRON_VERSION=0.0.4
 ARG GO_CRON_SHA256=6c8ac52637150e9c7ee88f43e29e158e96470a3aaa3fcf47fd33771a8a76d959
 
+RUN mkdir -p /root/usr/local/bin
+
 RUN \
   echo "**** build go-cron v${GO_CRON_VERSION} ****" && \
   curl -sL -o go-cron.tar.gz https://github.com/djmaze/go-cron/archive/v${GO_CRON_VERSION}.tar.gz && \
@@ -10,7 +12,13 @@ RUN \
   tar xzf go-cron.tar.gz && \
   cd go-cron-${GO_CRON_VERSION} && \
   go build && \
-  mv go-cron /usr/local/bin/go-cron
+  mv go-cron /root/usr/local/bin/go-cron
+
+# add local files
+COPY root/ /root/
+
+ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/20-install-pkg /root/etc/cont-init.d/20-install-pkg
+ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/30-wait-for-mnt /root/etc/cont-init.d/30-wait-for-mnt
 
 
 FROM ubuntu:20.04
@@ -73,13 +81,7 @@ RUN \
   rm -rf /tmp/* /var/lib/{apt,dpkg,cache,log}/
 
 # add build artifacts
-COPY --from=builder /usr/local/bin/* /usr/local/bin/
-
-ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/20-install-pkg /etc/cont-init.d/20-install-pkg
-ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/30-wait-for-mnt /etc/cont-init.d/30-wait-for-mnt
-
-# add local files
-COPY root/ /
+COPY --from=builder /root/ /
 
 RUN chmod a+x \
   /usr/local/bin/*
