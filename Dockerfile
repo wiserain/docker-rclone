@@ -3,7 +3,9 @@ FROM golang:1.16-bullseye AS builder
 ARG GO_CRON_VERSION=0.0.4
 ARG GO_CRON_SHA256=6c8ac52637150e9c7ee88f43e29e158e96470a3aaa3fcf47fd33771a8a76d959
 
-RUN mkdir -p /root/usr/local/bin
+RUN mkdir -p /bar
+
+ENV GOBIN=/bar/usr/local/bin
 
 RUN \
   echo "**** build go-cron v${GO_CRON_VERSION} ****" && \
@@ -11,14 +13,13 @@ RUN \
   echo "${GO_CRON_SHA256}  go-cron.tar.gz" | sha256sum -c - && \
   tar xzf go-cron.tar.gz && \
   cd go-cron-${GO_CRON_VERSION} && \
-  go build && \
-  mv go-cron /root/usr/local/bin/go-cron
+  go install
 
 # add local files
-COPY root/ /root/
+COPY root/ /bar/
 
-ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/20-install-pkg /root/etc/cont-init.d/20-install-pkg
-ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/30-wait-for-mnt /root/etc/cont-init.d/30-wait-for-mnt
+ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/20-install-pkg /bar/etc/cont-init.d/20-install-pkg
+ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/30-wait-for-mnt /bar/etc/cont-init.d/30-wait-for-mnt
 
 
 FROM ubuntu:20.04
@@ -30,6 +31,9 @@ ARG APT_MIRROR="archive.ubuntu.com"
 
 ARG RCLONE_TYPE="latest"
 ARG TARGETARCH
+
+# add build artifacts
+COPY --from=builder /bar/ /
 
 # install packages
 RUN \
@@ -72,6 +76,8 @@ RUN \
   echo "**** create abc user ****" && \
   useradd -u 911 -U -d /config -s /bin/false abc && \
   usermod -G users abc && \
+  echo "**** permissions ****" && \
+  chmod a+x /usr/local/bin/* && \
   echo "**** cleanup ****" && \
   apt-get purge -y \
     curl \
@@ -79,12 +85,6 @@ RUN \
   apt-get clean autoclean && \
   apt-get autoremove -y && \
   rm -rf /tmp/* /var/lib/{apt,dpkg,cache,log}/
-
-# add build artifacts
-COPY --from=builder /root/ /
-
-RUN chmod a+x \
-  /usr/local/bin/*
 
 # environment settings
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
