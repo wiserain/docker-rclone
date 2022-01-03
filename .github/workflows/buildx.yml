@@ -22,17 +22,34 @@ jobs:
       matrix:
         rclone-type: [latest, mod]
     steps:
+      - 
+        name: Check if buildx required
+        run: |
+          if [ ${{ matrix.rclone-type }} = "latest" ]; then
+            rclone_install_script_url="https://rclone.org/install.sh"
+          elif [ ${{ matrix.rclone-type }} = "mod" ]; then
+            rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"
+          fi
+          curl -fsSL $rclone_install_script_url | sudo bash
+          RCLONE_VER=$(rclone version | head -n1 | cut -f2 -dv)
+          docker pull ${{ env.IMAGE_NAME }}:$RCLONE_VER && X_SKIP=true || X_SKIP=false
+          [[ $GITHUB_EVENT_NAME != "schedule" ]] && X_SKIP=false
+          echo "X_SKIP=$X_SKIP" >> $GITHUB_ENV
       -
         name: Checkout
+        if: env.X_SKIP == 'false'
         uses: actions/checkout@v2
       -
         name: Set up QEMU
+        if: env.X_SKIP == 'false'
         uses: docker/setup-qemu-action@v1
       -
         name: Set up Buildx
+        if: env.X_SKIP == 'false'
         uses: docker/setup-buildx-action@v1
       - 
         name: Initial Buildx
+        if: env.X_SKIP == 'false'
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -43,6 +60,7 @@ jobs:
             RCLONE_TYPE=${{ matrix.rclone-type }}
       - 
         name: Load Built Image and Get Variables
+        if: env.X_SKIP == 'false'
         id: vars
         run: |
           docker buildx build \
@@ -54,39 +72,43 @@ jobs:
           CID=$(docker run -d ${{ env.IMAGE_NAME }}:testing)
           VER=$(docker exec $CID rclone version | head -n1 | cut -f2 -d'v')
           docker rm -f $CID
-          echo ::set-output name=app_ver::${VER}
+          echo "APP_VER=$VER" >> $GITHUB_ENV
           echo ::set-output name=github_desc::$(curl -sX GET https://api.github.com/repos/${GITHUB_REPOSITORY} | jq -r .description)
           echo ::set-output name=github_branch::${GITHUB_REF#refs/heads/}
       -
         name: Login to docker.io
+        if: env.X_SKIP == 'false'
         uses: docker/login-action@v1 
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASS }}
       -
         name: Login to ghcr.io
-        uses: docker/login-action@v1 
+        if: env.X_SKIP == 'false'
+        uses: docker/login-action@v1
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_PAT }}
       - 
         name: Buildx and Push
+        if: env.X_SKIP == 'false'
         uses: docker/build-push-action@v2
         with:
           context: .
           file: Dockerfile
           tags: |
             ${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
+            ${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
           push: true
       -
         name: Update Dockerhub description
+        if: env.X_SKIP == 'false'
         uses: peter-evans/dockerhub-description@v2
         with:
           username: ${{ env.DOCKERHUB_USER }}
@@ -96,15 +118,15 @@ jobs:
       -
         name: Notification
         uses: sarisia/actions-status-discord@v1
-        if: always()
+        if: env.X_SKIP == 'false' && always()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: ${{ job.status }}
           description: |
             ${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
+            ${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
 
   buildx-on-pr:
     runs-on: ubuntu-20.04
@@ -113,17 +135,34 @@ jobs:
       matrix:
         rclone-type: [latest, mod]
     steps:
-      -
+      - 
+        name: Check if buildx required
+        run: |
+          if [ ${{ matrix.rclone-type }} = "latest" ]; then
+            rclone_install_script_url="https://rclone.org/install.sh"
+          elif [ ${{ matrix.rclone-type }} = "mod" ]; then
+            rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"
+          fi
+          curl -fsSL $rclone_install_script_url | sudo bash
+          RCLONE_VER=$(rclone version | head -n1 | cut -f2 -dv)
+          docker pull ${{ env.IMAGE_NAME }}:$RCLONE_VER && X_SKIP=true || X_SKIP=false
+          [[ $GITHUB_EVENT_NAME != "schedule" ]] && X_SKIP=false
+          echo "X_SKIP=$X_SKIP" >> $GITHUB_ENV
+      - 
         name: Checkout
+        if: env.X_SKIP == 'false'
         uses: actions/checkout@v2
       -
         name: Set up QEMU
+        if: env.X_SKIP == 'false'
         uses: docker/setup-qemu-action@v1
       -
         name: Set up Buildx
+        if: env.X_SKIP == 'false'
         uses: docker/setup-buildx-action@v1
       - 
         name: Initial Buildx
+        if: env.X_SKIP == 'false'
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -132,37 +171,24 @@ jobs:
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
-      - 
-        name: Load Built Image and Get Variables
-        id: vars
-        run: |
-          docker buildx build \
-            -t ${{ env.IMAGE_NAME }}:testing \
-            --platform=linux/amd64 \
-            --build-arg RCLONE_TYPE=${{ matrix.rclone-type }} \
-            --load \
-            .
-          CID=$(docker run -d ${{ env.IMAGE_NAME }}:testing)
-          VER=$(docker exec $CID rclone version | head -n1 | cut -f2 -d'v')
-          docker rm -f $CID
-          echo ::set-output name=app_ver::${VER}
-          echo ::set-output name=github_desc::$(curl -sX GET https://api.github.com/repos/${GITHUB_REPOSITORY} | jq -r .description)
-          echo ::set-output name=github_branch::${GITHUB_REF#refs/heads/}
       -
         name: Login to docker.io
+        if: env.X_SKIP == 'false'
         uses: docker/login-action@v1 
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASS }}
       -
         name: Login to ghcr.io
-        uses: docker/login-action@v1 
+        if: env.X_SKIP == 'false'
+        uses: docker/login-action@v1
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GHCR_PAT }}
       - 
         name: Buildx and Push
+        if: env.X_SKIP == 'false'
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -173,11 +199,13 @@ jobs:
             ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
             ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
           platforms: linux/amd64,linux/arm/v7,linux/arm64
+          build-args: |
+            RCLONE_TYPE=${{ matrix.rclone-type }}
           push: true
       -
         name: Notification
         uses: sarisia/actions-status-discord@v1
-        if: always()
+        if: env.X_SKIP == 'false' && always()
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: ${{ job.status }}
