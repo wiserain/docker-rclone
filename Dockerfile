@@ -1,11 +1,17 @@
 FROM golang:1.16-bullseye AS builder
 
+ARG TARGETARCH
+ARG RCLONE_TYPE="latest"
+
+ARG DEBIAN_FRONTEND="noninteractive"
+ARG OVERLAY_VERSION=v2.2.0.3
 ARG GO_CRON_VERSION=0.0.4
 ARG GO_CRON_SHA256=6c8ac52637150e9c7ee88f43e29e158e96470a3aaa3fcf47fd33771a8a76d959
 
-RUN mkdir -p /bar
-
 ENV GOBIN=/bar/usr/local/bin
+
+# build artifacts root
+RUN mkdir -p /bar
 
 RUN \
   echo "**** build go-cron v${GO_CRON_VERSION} ****" && \
@@ -14,6 +20,24 @@ RUN \
   tar xzf go-cron.tar.gz && \
   cd go-cron-${GO_CRON_VERSION} && \
   go install
+
+RUN \
+  echo "**** add s6 overlay ****" && \
+  OVERLAY_ARCH=$(if [ "$TARGETARCH" = "arm64" ]; then echo "aarch64"; elif [ "$TARGETARCH" = "arm" ]; then echo "armhf"; else echo "$TARGETARCH"; fi) && \
+  curl -o /tmp/s6-overlay.tar.gz -L "https://github.com/just-containers/s6-overlay/releases/download/${OVERLAY_VERSION}/s6-overlay-${OVERLAY_ARCH}.tar.gz" && \
+  tar xzf /tmp/s6-overlay.tar.gz -C /bar/ --exclude='./bin' && \
+  tar xzf /tmp/s6-overlay.tar.gz -C /bar/usr ./bin
+
+RUN \
+  echo "**** add rclone ****" && \
+  apt-get update -qq && \
+  apt-get install -yq --no-install-recommends unzip && \
+  if [ "${RCLONE_TYPE}" = "latest" ]; then \
+    rclone_install_script_url="https://rclone.org/install.sh"; \
+  elif [ "${RCLONE_TYPE}" = "mod" ]; then \
+    rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"; fi && \
+  curl -fsSL $rclone_install_script_url | bash && \
+  mv /usr/bin/rclone /bar/usr/bin/rclone
 
 # add local files
 COPY root/ /bar/
@@ -28,9 +52,6 @@ LABEL org.opencontainers.image.source https://github.com/wiserain/docker-rclone
 
 ARG DEBIAN_FRONTEND="noninteractive"
 ARG APT_MIRROR="archive.ubuntu.com"
-
-ARG RCLONE_TYPE="latest"
-ARG TARGETARCH
 
 # add build artifacts
 COPY --from=builder /bar/ /
@@ -50,28 +71,14 @@ RUN \
     lsof \
     openssl \
     tzdata \
-    unionfs-fuse && \
+    unionfs-fuse \
+    wget && \
   update-ca-certificates && \
   sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
-  echo "**** install build packages ****" && \
-  apt-get install -yq --no-install-recommends \
-    curl \
-    unzip && \
-  echo "**** add s6 overlay ****" && \
-  OVERLAY_VERSION=$(curl -sX GET "https://api.github.com/repos/just-containers/s6-overlay/releases/latest" | awk '/tag_name/{print $4;exit}' FS='[""]') && \
-  OVERLAY_ARCH=$(if [ "$TARGETARCH" = "arm64" ]; then echo "aarch64"; elif [ "$TARGETARCH" = "arm" ]; then echo "armhf"; else echo "$TARGETARCH"; fi) && \
-  curl -o /tmp/s6-overlay.tar.gz -L "https://github.com/just-containers/s6-overlay/releases/download/${OVERLAY_VERSION}/s6-overlay-${OVERLAY_ARCH}.tar.gz" && \
-  tar xzf /tmp/s6-overlay.tar.gz -C / --exclude='./bin' && tar xzf /tmp/s6-overlay.tar.gz -C /usr ./bin && \
-  echo "**** add rclone ****" && \
-  if [ "${RCLONE_TYPE}" = "latest" ]; then \
-    rclone_install_script_url="https://rclone.org/install.sh"; \
-  elif [ "${RCLONE_TYPE}" = "mod" ]; then \
-    rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"; fi && \
-  curl -fsSL $rclone_install_script_url | bash && \
   echo "**** add mergerfs ****" && \
-  MFS_VERSION=$(curl -sX GET "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | awk '/tag_name/{print $4;exit}' FS='[""]') && \
+  MFS_VERSION=$(wget --no-check-certificate -O - -o /dev/null "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | awk '/tag_name/{print $4;exit}' FS='[""]') && \
   MFS_DEB="mergerfs_${MFS_VERSION}.ubuntu-focal_$(dpkg --print-architecture).deb" && \
-  cd $(mktemp -d) && curl -LJO "https://github.com/trapexit/mergerfs/releases/download/${MFS_VERSION}/${MFS_DEB}" && \
+  cd $(mktemp -d) && wget --no-check-certificate "https://github.com/trapexit/mergerfs/releases/download/${MFS_VERSION}/${MFS_DEB}" && \
   dpkg -i ${MFS_DEB} && \
   echo "**** create abc user ****" && \
   useradd -u 911 -U -d /config -s /bin/false abc && \
@@ -79,9 +86,6 @@ RUN \
   echo "**** permissions ****" && \
   chmod a+x /usr/local/bin/* && \
   echo "**** cleanup ****" && \
-  apt-get purge -y \
-    curl \
-    unzip && \
   apt-get clean autoclean && \
   apt-get autoremove -y && \
   rm -rf /tmp/* /var/lib/{apt,dpkg,cache,log}/

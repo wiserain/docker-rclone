@@ -43,7 +43,7 @@ docker run -d \
     --name=rclone \
     --cap-add SYS_ADMIN \
     --device /dev/fuse \
-    --security-opt apparmor=unconfined
+    --security-opt apparmor=unconfined \
     -v ${DOCKER_ROOT}/rclone/config:/config \
     -v ${DOCKER_ROOT}/rclone/log:/log \
     -v ${DOCKER_ROOT}/rclone/cache:/cache \
@@ -93,7 +93,7 @@ Please note that variables only with capital letters are configurable by environ
 | ```PUID``` / ```PGID```  | uid and gid for running an app  | ```911``` / ```911```  |
 | ```TZ```  | timezone, required for correct timestamp in log  |   |
 | ```RCLONE_REMOTE_PATH```  | this should be in ```rclone.conf```  |   |
-| ```RCLONE_CONFIG```  | path to ```rclone.conf```  |  ```/log/rclone.conf``` |
+| ```RCLONE_CONFIG```  | path to ```rclone.conf```  |  ```/config/rclone.conf``` |
 | ```RCLONE_LOG_LEVEL```  | log level for rclone runtime  | ```NOTICE```  |
 | ```RCLONE_LOG_FILE```  | to redirect logging to file  |   |
 | ```RCLONE_MOUNT_USER_OPTS```  | additioanl arguments will be appended to the basic options in the above command  |   |

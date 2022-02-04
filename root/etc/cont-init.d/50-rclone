@@ -37,7 +37,7 @@ while findmnt "${rclone_mountpoint}" | grep -q fuse.rclone; do
     sleep 30s
 done
 
-# permissions
+# permissions
 chown -R abc:abc \
     /config /log /cloud /data
 chown abc:abc /cache /local
