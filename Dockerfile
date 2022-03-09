@@ -1,43 +1,33 @@
-FROM golang:1.16-bullseye AS builder
+ARG UBUNTU_VER=20.04
 
-ARG TARGETARCH
+FROM ubuntu:${UBUNTU_VER} AS ubuntu
+FROM ghcr.io/by275/prebuilt:ubuntu${UBUNTU_VER} AS prebuilt
+
+# 
+# BUILD
+# 
+FROM ubuntu AS builder
+
 ARG RCLONE_TYPE="latest"
-
 ARG DEBIAN_FRONTEND="noninteractive"
-ARG OVERLAY_VERSION=v2.2.0.3
-ARG GO_CRON_VERSION=0.0.4
-ARG GO_CRON_SHA256=6c8ac52637150e9c7ee88f43e29e158e96470a3aaa3fcf47fd33771a8a76d959
 
-ENV GOBIN=/bar/usr/local/bin
+# add go-cron
+COPY --from=prebuilt /go/bin/go-cron /bar/usr/local/bin/
 
-# build artifacts root
-RUN mkdir -p /bar
+# add s6 overlay
+COPY --from=prebuilt /s6/ /bar/
 
 RUN \
-  echo "**** build go-cron v${GO_CRON_VERSION} ****" && \
-  curl -sL -o go-cron.tar.gz https://github.com/djmaze/go-cron/archive/v${GO_CRON_VERSION}.tar.gz && \
-  echo "${GO_CRON_SHA256}  go-cron.tar.gz" | sha256sum -c - && \
-  tar xzf go-cron.tar.gz && \
-  cd go-cron-${GO_CRON_VERSION} && \
-  go install
-
-RUN \
-  echo "**** add s6 overlay ****" && \
-  OVERLAY_ARCH=$(if [ "$TARGETARCH" = "arm64" ]; then echo "aarch64"; elif [ "$TARGETARCH" = "arm" ]; then echo "armhf"; else echo "$TARGETARCH"; fi) && \
-  curl -o /tmp/s6-overlay.tar.gz -L "https://github.com/just-containers/s6-overlay/releases/download/${OVERLAY_VERSION}/s6-overlay-${OVERLAY_ARCH}.tar.gz" && \
-  tar xzf /tmp/s6-overlay.tar.gz -C /bar/ --exclude='./bin' && \
-  tar xzf /tmp/s6-overlay.tar.gz -C /bar/usr ./bin
-
-RUN \
-  echo "**** add rclone ****" && \
-  apt-get update -qq && \
-  apt-get install -yq --no-install-recommends unzip && \
-  if [ "${RCLONE_TYPE}" = "latest" ]; then \
-    rclone_install_script_url="https://rclone.org/install.sh"; \
-  elif [ "${RCLONE_TYPE}" = "mod" ]; then \
-    rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"; fi && \
-  curl -fsSL $rclone_install_script_url | bash && \
-  mv /usr/bin/rclone /bar/usr/bin/rclone
+    echo "**** add rclone ****" && \
+    apt-get update -qq && \
+    apt-get install -yq --no-install-recommends \
+        ca-certificates curl unzip && \
+    if [ "${RCLONE_TYPE}" = "latest" ]; then \
+        rclone_install_script_url="https://rclone.org/install.sh"; \
+    elif [ "${RCLONE_TYPE}" = "mod" ]; then \
+        rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"; fi && \
+    curl -fsSL $rclone_install_script_url | bash && \
+    mv /usr/bin/rclone /bar/usr/bin/rclone
 
 # add local files
 COPY root/ /bar/
@@ -45,8 +35,10 @@ COPY root/ /bar/
 ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/20-install-pkg /bar/etc/cont-init.d/20-install-pkg
 ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/30-wait-for-mnt /bar/etc/cont-init.d/30-wait-for-mnt
 
-
-FROM ubuntu:20.04
+# 
+# RELEASE
+# 
+FROM ubuntu
 LABEL maintainer="wiserain"
 LABEL org.opencontainers.image.source https://github.com/wiserain/docker-rclone
 
@@ -58,40 +50,41 @@ COPY --from=builder /bar/ /
 
 # install packages
 RUN \
-  echo "**** apt source change for local build ****" && \
-  sed -i "s/archive.ubuntu.com/$APT_MIRROR/g" /etc/apt/sources.list && \
-  echo "**** install runtime packages ****" && \
-  apt-get update && \
-  apt-get install -yq --no-install-recommends apt-utils && \
-  apt-get install -yq --no-install-recommends \
-    bc \
-    ca-certificates \
-    fuse \
-    jq \
-    lsof \
-    openssl \
-    tzdata \
-    unionfs-fuse \
-    wget && \
-  update-ca-certificates && \
-  sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
-  echo "**** add mergerfs ****" && \
-  MFS_VERSION=$(wget --no-check-certificate -O - -o /dev/null "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | awk '/tag_name/{print $4;exit}' FS='[""]') && \
-  MFS_DEB="mergerfs_${MFS_VERSION}.ubuntu-focal_$(dpkg --print-architecture).deb" && \
-  cd $(mktemp -d) && wget --no-check-certificate "https://github.com/trapexit/mergerfs/releases/download/${MFS_VERSION}/${MFS_DEB}" && \
-  dpkg -i ${MFS_DEB} && \
-  echo "**** create abc user ****" && \
-  useradd -u 911 -U -d /config -s /bin/false abc && \
-  usermod -G users abc && \
-  echo "**** permissions ****" && \
-  chmod a+x /usr/local/bin/* && \
-  echo "**** cleanup ****" && \
-  apt-get clean autoclean && \
-  apt-get autoremove -y && \
-  rm -rf /tmp/* /var/lib/{apt,dpkg,cache,log}/
+    echo "**** apt source change for local build ****" && \
+    sed -i "s/archive.ubuntu.com/$APT_MIRROR/g" /etc/apt/sources.list && \
+    echo "**** install runtime packages ****" && \
+    apt-get update && \
+    apt-get install -yq --no-install-recommends apt-utils && \
+    apt-get install -yq --no-install-recommends \
+        bc \
+        ca-certificates \
+        fuse \
+        jq \
+        lsof \
+        openssl \
+        tzdata \
+        unionfs-fuse \
+        wget && \
+    update-ca-certificates && \
+    sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
+    echo "**** add mergerfs ****" && \
+    MFS_VERSION=$(wget --no-check-certificate -O - -o /dev/null "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | awk '/tag_name/{print $4;exit}' FS='[""]') && \
+    MFS_DEB="mergerfs_${MFS_VERSION}.ubuntu-focal_$(dpkg --print-architecture).deb" && \
+    cd $(mktemp -d) && wget --no-check-certificate "https://github.com/trapexit/mergerfs/releases/download/${MFS_VERSION}/${MFS_DEB}" && \
+    dpkg -i ${MFS_DEB} && \
+    echo "**** create abc user ****" && \
+    useradd -u 911 -U -d /config -s /bin/false abc && \
+    usermod -G users abc && \
+    echo "**** permissions ****" && \
+    chmod a+x /usr/local/bin/* && \
+    echo "**** cleanup ****" && \
+    apt-get clean autoclean && \
+    apt-get autoremove -y && \
+    rm -rf /tmp/* /var/lib/{apt,dpkg,cache,log}/
 
 # environment settings
-ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
+ENV \
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
     S6_KILL_FINISH_MAXTIME=7000 \
     S6_SERVICES_GRACETIM=5000 \
     S6_KILL_GRACETIME=5000 \
@@ -106,6 +99,7 @@ ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
 VOLUME /config /cache /log /cloud /data /local
 WORKDIR /data
 
-HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 CMD healthcheck.sh
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+    CMD /usr/local/bin/healthcheck
 
 ENTRYPOINT ["/init"]
