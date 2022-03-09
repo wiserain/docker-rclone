@@ -36,7 +36,7 @@ services:
       - RCLONE_REMOTE_PATH=remote_name:path/to/mount
 ```
 
-equivalently, 
+equivalently,
 
 ```bash
 docker run -d \
@@ -108,6 +108,7 @@ mergerfs \
     -o ${MFS_USER_OPTS} \
     /local=RW:/cloud=NC /data
 ```
+
 where a default value of ```MFS_USER_OPTS``` is
 
 ```bash
@@ -122,6 +123,7 @@ unionfs \
     -o ${UFS_USER_OPTS} \
     /local=RW:/cloud=RO /data
 ```
+
 where a default value of ```UFS_USER_OPTS``` is
 
 ```bash
@@ -130,7 +132,7 @@ UFS_USER_OPTS="cow,direct_io,nonempty,auto_cache,sync_read"
 
 ### Built-in scripts
 
-Two scripts performing basic rclone operations such as copy and move between ```/local``` and ```/cloud``` are prepared for your conveinence. Since they are from local to cloud directories, it is meaningful only when you mount an additional ```/local``` directory. 
+Two scripts performing basic rclone operations such as copy and move between ```/local``` and ```/cloud``` are prepared for your conveinence. Since they are from local to cloud directories, it is meaningful only when you mount an additional ```/local``` directory.
 
 #### copy_local
 

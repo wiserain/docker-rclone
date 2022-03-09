@@ -6,19 +6,19 @@ logf() {
 
 # If script is already running; abort.
 if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
-	logf "Already in progress. Aborting!"
-	exit 3
+    logf "Already in progress. Aborting!"
+    exit 3
 fi
 
 # Check if any files exist, if not exit
 file_ct=$(find /local -type f | wc -l)
 if [ "$file_ct" = 0 ];then
-	# logf "Nothing to copy. Exiting."
-	exit 3
+    # logf "Nothing to copy. Exiting."
+    exit 3
 fi
 
 humanReadableSize () {
-	numfmt --to=iec $1 --suffix=B --format="%.2f"
+    numfmt --to=iec $1 --suffix=B --format="%.2f"
 }
 
 pSize=0
@@ -30,53 +30,53 @@ prune_paths=$(find /local -name .nocopy -printf "-path %h -o ")
 
 # Generate filelist and iterate through it...
 while read -r n; do
-	# sometimes empty stdin can be redirected by the result of find
-	if [ ! -f "$n" ]; then continue; fi
+    # sometimes empty stdin can be redirected by the result of find
+    if [ ! -f "$n" ]; then continue; fi
 
-	# Find the pathname relative to the root of your remote and store filename
-	filename="$(echo "$n" | sed -e s@"/local"@@)"
-	destpath="$(dirname "$n" | sed -e s@"/local"@@)"
-	basefile="$(basename "$n")"
+    # Find the pathname relative to the root of your remote and store filename
+    filename="$(echo "$n" | sed -e s@"/local"@@)"
+    destpath="$(dirname "$n" | sed -e s@"/local"@@)"
+    basefile="$(basename "$n")"
 
-	# Skip hidden or partial files.
-	case "$n" in
-		(*.partial~) continue ;;
-		(*_HIDDEN~) continue ;;
-		(*.QTFS) continue ;;
-		(*.unionfs-fuse*) continue ;;
-		(*.DS_STORE) continue ;;
-		(*.part) continue ;;
-		(*.nocopy) continue ;;
-		(*.nomove) continue ;;
-	esac
+    # Skip hidden or partial files.
+    case "$n" in
+        (*.partial~) continue ;;
+        (*_HIDDEN~) continue ;;
+        (*.QTFS) continue ;;
+        (*.unionfs-fuse*) continue ;;
+        (*.DS_STORE) continue ;;
+        (*.part) continue ;;
+        (*.nocopy) continue ;;
+        (*.nomove) continue ;;
+    esac
 
-	# Skip if files already in /cloud
-	if [ -f "/cloud${filename}" ]; then
-		continue
-	fi
+    # Skip if files already in /cloud
+    if [ -f "/cloud${filename}" ]; then
+        continue
+    fi
 
-	# If file is opened by another process, wait until it isn't.
-	while [ "$(lsof "$n" >/dev/null 2>&1)" ] || \
-		[ "$(lsof "/local/${n}" >/dev/null 2>&1)" ] || \
-		[ "$(lsof "/data/${n}" >/dev/null 2>&1)" ]; do
-		logf "File -> ${n} in use. Retrying in 10 seconds ..."
-		sleep 10
-	done
+    # If file is opened by another process, wait until it isn't.
+    while [ "$(lsof "$n" >/dev/null 2>&1)" ] || \
+        [ "$(lsof "/local/${n}" >/dev/null 2>&1)" ] || \
+        [ "$(lsof "/data/${n}" >/dev/null 2>&1)" ]; do
+        logf "File -> ${n} in use. Retrying in 10 seconds ..."
+        sleep 10
+    done
 
-	fileSize=$(stat "$n" -c %s)
+    fileSize=$(stat "$n" -c %s)
 
-	# Copy file to remote destination[s], retaining path
-	rclone copy "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		pSize=$((pSize + fileSize))
-		pCount=$((pCount + 1))
-		logf "$basefile ($(humanReadableSize $fileSize))"
-	fi
+    # Copy file to remote destination[s], retaining path
+    rclone copy "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        pSize=$((pSize + fileSize))
+        pCount=$((pCount + 1))
+        logf "$basefile ($(humanReadableSize $fileSize))"
+    fi
 done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print0 | xargs -0 --no-run-if-empty stat --format '%Y :%y %n' | sort -nr | cut -d: -f2- | awk '{$1=$2=$3=""; print $0}')
 
 # final report
 if [[ "${pCount}" -gt "0" ]]; then
-	logf "###### Total $(humanReadableSize $pSize) of $pCount file(s) copied ######"
+    logf "###### Total $(humanReadableSize $pSize) of $pCount file(s) copied ######"
 fi
 # logf "###### rclone copy finished successfully ######"
 
