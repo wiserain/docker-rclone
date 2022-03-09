@@ -3,3 +3,5 @@
 # unmount fuse
 fusermount -uz /data
 [[ -n "${POOLING_FS:-}" ]] && fusermount -uz /cloud
+
+exit 0

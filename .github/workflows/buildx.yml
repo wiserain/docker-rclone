@@ -74,7 +74,6 @@ jobs:
           docker rm -f $CID
           echo "APP_VER=$VER" >> $GITHUB_ENV
           echo ::set-output name=github_desc::$(curl -sX GET https://api.github.com/repos/${GITHUB_REPOSITORY} | jq -r .description)
-          echo ::set-output name=github_branch::${GITHUB_REF#refs/heads/}
       -
         name: Login to docker.io
         if: env.X_SKIP == 'false'
@@ -195,9 +194,9 @@ jobs:
           file: Dockerfile
           tags: |
             ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
-            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
+            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-${{ github.event.pull_request.number }}
             ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
-            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
+            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-${{ github.event.pull_request.number }}
           platforms: linux/amd64,linux/arm/v7,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
@@ -211,6 +210,6 @@ jobs:
           status: ${{ job.status }}
           description: |
             ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
-            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
+            ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-${{ github.event.pull_request.number }}
             ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
-            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-pr-${{ github.event.pull_request.number }}
+            ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-${{ github.event.pull_request.number }}
