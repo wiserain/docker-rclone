@@ -1,7 +1,7 @@
 ARG UBUNTU_VER=20.04
 
 FROM ubuntu:${UBUNTU_VER} AS ubuntu
-FROM ghcr.io/by275/prebuilt:ubuntu${UBUNTU_VER} AS prebuilt
+FROM ghcr.io/by275/base:ubuntu${UBUNTU_VER} AS prebuilt
 
 # 
 # BUILD
@@ -32,8 +32,9 @@ RUN \
 # add local files
 COPY root/ /bar/
 
-ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/20-install-pkg /bar/etc/cont-init.d/20-install-pkg
-ADD https://raw.githubusercontent.com/by275/docker-scripts/master/root/etc/cont-init.d/30-wait-for-mnt /bar/etc/cont-init.d/30-wait-for-mnt
+ADD https://raw.githubusercontent.com/by275/docker-base/main/_/etc/cont-init.d/adduser /bar/etc/cont-init.d/10-adduser
+ADD https://raw.githubusercontent.com/by275/docker-base/main/_/etc/cont-init.d/install-pkg /bar/etc/cont-init.d/20-install-pkg
+ADD https://raw.githubusercontent.com/by275/docker-base/main/_/etc/cont-init.d/wait-for-mnt /bar/etc/cont-init.d/30-wait-for-mnt
 
 # 
 # RELEASE
