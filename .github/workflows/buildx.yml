@@ -172,14 +172,14 @@ jobs:
             RCLONE_TYPE=${{ matrix.rclone-type }}
       -
         name: Login to docker.io
-        if: env.X_SKIP == 'false'
+        if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
         uses: docker/login-action@v1
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASS }}
       -
         name: Login to ghcr.io
-        if: env.X_SKIP == 'false'
+        if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -187,7 +187,7 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
       -
         name: Buildx and Push
-        if: env.X_SKIP == 'false'
+        if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
         uses: docker/build-push-action@v2
         with:
           context: .
@@ -204,7 +204,7 @@ jobs:
       -
         name: Notification
         uses: sarisia/actions-status-discord@v1
-        if: env.X_SKIP == 'false' && always()
+        if: env.X_SKIP == 'false' && always() && github.actor == github.event.repository.owner.login
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
           status: ${{ job.status }}
