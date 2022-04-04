@@ -5,5 +5,5 @@ IFS=" " read -r -a rclone_mount_user_opts <<< "$RCLONE_MOUNT_USER_OPTS"
 
 mount_command="rclone mount ${RCLONE_REMOTE_PATH} ${rclone_mountpoint} $(echo $rclone_mount_basic_opts) ${rclone_mount_user_opts[@]}"
 echo "*** mounting => $mount_command"
-s6-notifyoncheck -d -n 0 -s 3000 \
+exec s6-notifyoncheck -d -n 0 -s 3000 \
     s6-setuidgid abc $mount_command

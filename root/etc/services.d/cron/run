@@ -38,4 +38,4 @@ for cron in "${!RCLONE_REFRESH_CRON@}"; do
     fi
 done
 
-wait
+exec wait
