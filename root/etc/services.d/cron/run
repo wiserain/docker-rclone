@@ -2,23 +2,9 @@
 
 s6-svwait -U /var/run/s6/services/rclone
 
-if [[ -n "${COPY_LOCAL_SCHEDULE:-}" ]]; then
-    echo "*** scheduling job: copy_local"
-    echo "WARNING: env COPY_LOCAL_SCHEDULE deprecated. Use COPY_LOCAL_CRON instead!"
-    go-cron "$COPY_LOCAL_SCHEDULE" /usr/local/bin/copy_local &
-    sleep 2
-fi
-
 if [[ -n "${COPY_LOCAL_CRON:-}" ]]; then
     echo "*** scheduling job: copy_local"
     go-cron "$COPY_LOCAL_CRON" /usr/local/bin/copy_local &
-    sleep 2
-fi
-
-if [[ -n "${MOVE_LOCAL_SCHEDULE:-}" ]]; then
-    echo "*** scheduling job: move_local"
-    echo "WARNING: env MOVE_LOCAL_SCHEDULE deprecated. Use MOVE_LOCAL_CRON instead!"
-    go-cron "$MOVE_LOCAL_SCHEDULE" /usr/local/bin/move_local &
     sleep 2
 fi
 
