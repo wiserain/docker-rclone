@@ -42,7 +42,7 @@ jobs:
       -
         name: Set up QEMU
         if: env.X_SKIP == 'false'
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
       -
         name: Set up Buildx
         if: env.X_SKIP == 'false'
@@ -154,7 +154,7 @@ jobs:
       -
         name: Set up QEMU
         if: env.X_SKIP == 'false'
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
       -
         name: Set up Buildx
         if: env.X_SKIP == 'false'
