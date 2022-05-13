@@ -36,6 +36,10 @@ ADD https://raw.githubusercontent.com/by275/docker-base/main/_/etc/cont-init.d/a
 ADD https://raw.githubusercontent.com/by275/docker-base/main/_/etc/cont-init.d/install-pkg /bar/etc/cont-init.d/20-install-pkg
 ADD https://raw.githubusercontent.com/by275/docker-base/main/_/etc/cont-init.d/wait-for-mnt /bar/etc/cont-init.d/30-wait-for-mnt
 
+RUN \
+    echo "**** permissions ****" && \
+    chmod a+x /bar/usr/local/bin/*
+
 # 
 # RELEASE
 # 
@@ -45,9 +49,6 @@ LABEL org.opencontainers.image.source https://github.com/wiserain/docker-rclone
 
 ARG DEBIAN_FRONTEND="noninteractive"
 ARG APT_MIRROR="archive.ubuntu.com"
-
-# add build artifacts
-COPY --from=builder /bar/ /
 
 # install packages
 RUN \
@@ -76,12 +77,13 @@ RUN \
     echo "**** create abc user ****" && \
     useradd -u 911 -U -d /config -s /bin/false abc && \
     usermod -G users abc && \
-    echo "**** permissions ****" && \
-    chmod a+x /usr/local/bin/* && \
     echo "**** cleanup ****" && \
     apt-get clean autoclean && \
     apt-get autoremove -y && \
     rm -rf /tmp/* /var/lib/{apt,dpkg,cache,log}/
+
+# add build artifacts
+COPY --from=builder /bar/ /
 
 # environment settings
 ENV \
