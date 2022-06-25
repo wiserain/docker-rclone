@@ -40,7 +40,7 @@ ADD https://raw.githubusercontent.com/by275/docker-base/main/_/etc/cont-init.d/w
 COPY --from=prebuilt /go/bin/go-cron /bar/usr/local/bin/
 
 # add rclone
-COPY --from=rclone /usr/bin/rclone /bar/usr/local/bin/
+COPY --from=rclone /usr/bin/rclone /bar/usr/bin/
 
 # add local files
 COPY root/ /bar/
