@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bash
 
-s6-svwait -U /var/run/s6/services/rclone
+s6-svwait -U /var/run/service/mount
 
 if [[ -n "${COPY_LOCAL_CRON:-}" ]]; then
     echo "*** scheduling job: copy_local"
