@@ -1,9 +1,8 @@
 # docker-rclone
 
-Docker image for [rclone](https://rclone.org/) mount, with
+Docker image for pooling filesystem [mergerfs](https://github.com/trapexit/mergerfs/) mount or [unionfs](https://github.com/rpodgorny/unionfs-fuse/) mount, with
 
 - Ubuntu 20.04
-- pooling filesystem (a choice of mergerfs or unionfs)
 - some useful scripts
 
 ## Usage
@@ -13,16 +12,15 @@ version: '3'
 
 services:
   rclone:
-    container_name: rclone
-    image: wiserain/rclone
+    container_name: mergerfs
+    image: slink42/mergerfs
     restart: always
     network_mode: "bridge"
     volumes:
-      - ${DOCKER_ROOT}/rclone/config:/config
-      - ${DOCKER_ROOT}/rclone/log:/log
-      - ${DOCKER_ROOT}/rclone/cache:/cache
-      - /your/mounting/point:/data:shared
-      - /local/dir/to/be/merged/with:/local     # Optional: if you have a folder to be mergerfs/unionfs with
+      - ${DOCKER_ROOT}/mergerfs/config:/config
+      - ${DOCKER_ROOT}/mergerfs/log:/log
+      - ${DOCKER_ROOT}/mergerfs/cache:/cache
+      - /your/mounting/point:/mnt:rshared
     devices:
       - /dev/fuse
     cap_add:
@@ -32,8 +30,9 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-      - TZ=Asia/Seoul
-      - RCLONE_REMOTE_PATH=remote_name:path/to/mount
+      - TZ=Australia/Sydney
+      - MERGED_DEST=/mnt/data
+      - MFS_BRANCHES:/mnt/local=RW:/mnt/cloud=NC
 ```
 
 equivalently,
@@ -52,11 +51,12 @@ docker run -d \
     -e PUID=${PUID} \
     -e PGID=${PGID} \
     -e TZ=Asia/Seoul \
-    -e RCLONE_REMOTE_PATH=remote_name:path/to/mount \
-    wiserain/rclone
+    -e MERGED_DEST=/mnt/data \
+    -e MFS_BRANCHES:/mnt/local1=RW:/mnt/local12=NC \
+    slink42/mergerfs
 ```
 
-First, you need to prepare an rclone configuration file in ```/config/rclone.conf```. It can be done manually (copy yourself) or by running a built-in script below
+First, you need to prepare volume bind mounts for folders to merge.
 
 ```bash
 docker-compose exec <service_name> rclone_setup
@@ -73,7 +73,7 @@ docker logs <container name or sha1, e.g. rclone>
 Here is the internal command for rclone mount.
 
 ```bash
-rclone mount ${RCLONE_REMOTE_PATH} ${rclone_mountpoint} \
+rclone mount ${RCLONE_REMOTE_PATH} ${mergerfs_mountpoint} \
     --uid=${PUID:-911} \
     --gid=${PGID:-911} \
     --cache-dir=/cache \
