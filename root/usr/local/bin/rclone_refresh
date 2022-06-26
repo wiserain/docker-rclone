@@ -1,6 +1,0 @@
-#!/bin/bash
-
-# su abc -s "/bin/bash" -m -c \
-#     "rclone_refresh.script $@ 2>&1 | tee -a /log/rclone_refresh.log"
-exec s6-setuidgid abc \
-    rclone_refresh.script $@ 2>&1 | tee -a /log/rclone_refresh.log

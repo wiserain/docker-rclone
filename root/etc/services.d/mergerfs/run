@@ -1,0 +1,20 @@
+#!/usr/bin/with-contenv bash
+. /usr/local/bin/variables
+
+if [ "$poolingfs" == "mergerfs" ]; then
+    IFS=" " read -r -a mfs_user_opts <<< "$MFS_USER_OPTS"
+    mount_command="mergerfs ${mfs_branches} ${fuse_mountpoint} -o ${mfs_basic_opts} -o ${mfs_user_opts}"
+fi
+
+if [ "$poolingfs" == "unionfs" ]; then
+    IFS=" " read -r -a ufs_user_opts <<< "$UFS_USER_OPTS"
+    mount_command="unionfs ${ufs_branches} ${fuse_mountpoint} -o ${ufs_basic_opts} -o ${ufs_user_opts}"
+fi
+
+[ -z "$mount_command" ] && echo "error: emtpy mount_command" && exit 1
+
+echo "*** pooling => $mount_command"
+exec s6-notifyoncheck -d -n 0 -s 3000 \
+    s6-setuidgid abc $mount_command
+
+   
