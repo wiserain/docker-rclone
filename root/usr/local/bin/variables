@@ -1,18 +1,8 @@
 #!/usr/bin/with-contenv bash
 
 fuse_mountpoint=${MERGED_DEST:-/mnt/data}
+poolingfs=${POOLING_FS:-mergerfs}
 
-rclone_mount_basic_opts="
---uid=${PUID:-911}
---gid=${PGID:-911}
---cache-dir=/cache
---use-mmap
---allow-other
---umask=002
---rc
---rc-no-auth
---rc-addr=:5574
-"
 
 mfs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
 mfs_branches=${MFS_BRANCHES:-/mnt/local=RW:/mnt/cloud=NC}
