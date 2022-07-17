@@ -1,0 +1,26 @@
+#!/usr/bin/with-contenv bash
+. /usr/local/bin/variables
+
+if [ "$poolingfs" == "mergerfs" ]; then
+    echo "*** checking mergerfs mountpoint: ${fuse_mountpoint}"
+    while findmnt "${fuse_mountpoint}" | grep -q fuse.mergerfs; do
+        echo "ERROR: mergerfs mountpoint (${fuse_mountpoint}) already mounted"
+        fusermount -uz "${fuse_mountpoint}"
+        echo "Retrying in 30s ..."
+        sleep 30s
+    done
+fi
+
+if [ "$poolingfs" == "unionfs" ]; then
+    echo "*** checking unionfs mountpoint: ${fuse_mountpoint}"
+    while findmnt "${fuse_mountpoint}" | grep -q fuse.unionfs; do
+        echo "ERROR: unionfs mountpoint (${fuse_mountpoint}) already mounted"
+        fusermount -uz "${fuse_mountpoint}"
+        echo "Retrying in 30s ..."
+        sleep 30s
+    done
+fi
+
+# permissions
+chown -R abc:abc \
+    /config /log /cloud /data ${fuse_mountpoint}
