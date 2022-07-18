@@ -43,7 +43,7 @@ for cron in "${!RCLONE_REFRESH_CRON@}"; do
     crons+=("${!cron}")
 done
 ndup=$(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];c++} END {print c}')
-if [ $ndup -ne ${#crons[@]} ]; then
+if [ ${#crons[@]} -ne 0 ] && [ ${#crons[@]} -ne $ndup ]; then
     echo "*** ERROR: found duplicates in your RCLONE_REFRESH_CRON*"
     while IFS= read -r dup; do
         printf "  - \"%s\" -> " "$dup"
