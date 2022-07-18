@@ -37,6 +37,24 @@ while findmnt "${rclone_mountpoint}" | grep -q fuse.rclone; do
     sleep 30s
 done
 
+# checking duplicates in RCLONE_REFRESH_CRON@
+crons=()
+for cron in "${!RCLONE_REFRESH_CRON@}"; do
+    crons+=("${!cron}")
+done
+ndup=$(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];c++} END {print c}')
+if [ $ndup -ne ${#crons[@]} ]; then
+    echo "*** ERROR: found duplicates in your RCLONE_REFRESH_CRON*"
+    while IFS= read -r dup; do
+        printf "  - \"%s\" -> " "$dup"
+        for cron in "${!RCLONE_REFRESH_CRON@}"; do
+            [ "$dup" = "${!cron}" ] && printf '%s ' "${cron}"
+        done
+        printf "\n"
+    done <<< $(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];next} 1')
+    exit 1
+fi
+
 # permissions
 chown -R abc:abc \
     /config /log /cloud /data
