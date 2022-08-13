@@ -1,4 +1,4 @@
-ARG UBUNTU_VER=20.04
+ARG UBUNTU_VER=22.04
 
 FROM ghcr.io/by275/base:ubuntu AS prebuilt
 FROM ghcr.io/by275/base:ubuntu${UBUNTU_VER} AS base
@@ -102,7 +102,8 @@ RUN \
     sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
     echo "**** add mergerfs ****" && \
     MFS_VERSION=$(curl -fsL "https://api.github.com/repos/trapexit/mergerfs/releases/latest" | awk '/tag_name/{print $4;exit}' FS='[""]') && \
-    MFS_DEB="mergerfs_${MFS_VERSION}.ubuntu-focal_$(dpkg --print-architecture).deb" && \
+    CODENAME=$(. /etc/os-release && echo $VERSION_CODENAME) && \
+    MFS_DEB="mergerfs_${MFS_VERSION}.ubuntu-${CODENAME}_$(dpkg --print-architecture).deb" && \
     cd $(mktemp -d) && curl -LJO "https://github.com/trapexit/mergerfs/releases/download/${MFS_VERSION}/${MFS_DEB}" && \
     dpkg -i ${MFS_DEB} && \
     echo "**** cleanup ****" && \
