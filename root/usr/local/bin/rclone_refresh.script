@@ -72,6 +72,18 @@ else
 
     IFS="|" read -r -a RDIRS <<< "$1"
 
+    if [ "${RCLONE_REFRESH_BRACE_EXPANSION}" -eq 1 ]; then
+        # applying bash brace expansion for a list of vertical-bar-separated paths
+        # 1. escape spaces using 'sed -e'
+        # 2. apply brace expansion using 'eval printf'
+        # 3. readarray from the result of #2 and append to existing one
+        expdirs=()
+        for RDIR in "${RDIRS[@]}"; do
+            readarray -t -O"${#expdirs[@]}" expdirs <<< "$(eval printf '"%s\n"' $(echo "$RDIR" | sed -e 's/ /\\ /g'))"
+        done
+        RDIRS=("${expdirs[@]}")
+    fi
+
     if [ "${RCLONE_REFRESH_METHOD}" == "default" ]; then
         count=0
         dirs=()

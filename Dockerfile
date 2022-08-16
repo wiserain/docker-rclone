@@ -124,6 +124,7 @@ ENV \
     S6_KILL_GRACETIME=5000 \
     RCLONE_CONFIG=/config/rclone.conf \
     RCLONE_REFRESH_METHOD=default \
+    RCLONE_REFRESH_BRACE_EXPANSION=0 \
     UFS_USER_OPTS="cow,direct_io,nonempty,auto_cache,sync_read" \
     MFS_USER_OPTS="rw,use_ino,func.getattr=newest,category.action=all,category.create=ff,cache.files=auto-full,dropcacheonclose=true" \
     DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
