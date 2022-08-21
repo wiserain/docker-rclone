@@ -68,9 +68,7 @@ jobs:
             --build-arg RCLONE_TYPE=${{ matrix.rclone-type }} \
             --load \
             .
-          CID=$(docker run -d ${{ env.IMAGE_NAME }}:testing)
-          VER=$(docker exec $CID rclone version | head -n1 | cut -f2 -d'v')
-          docker rm -f $CID
+          VER=$(docker run --rm --entrypoint=/usr/bin/rclone ${{ env.IMAGE_NAME }}:testing version | head -n1 | cut -f2 -d'v')
           echo "APP_VER=$VER" >> $GITHUB_ENV
           echo ::set-output name=github_desc::$(curl -sX GET https://api.github.com/repos/${GITHUB_REPOSITORY} | jq -r .description)
       -
