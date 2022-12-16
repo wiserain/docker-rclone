@@ -1,0 +1,14 @@
+#!/usr/bin/with-contenv bash
+. /usr/local/bin/variables
+
+case "$RCLONE_SERVE_MODE" in
+    dlna|docker|ftp|http|restic|sftp|webdav)
+        ;;
+    *)
+        s6-svc -d . && exit 0
+        ;;
+esac
+
+serve_command="rclone serve $RCLONE_SERVE_MODE ${rclone_mountpoint} ${RCLONE_SERVE_ARGS:---use-mmap --addr=:5678}"
+echo "*** serving => $serve_command"
+exec s6-setuidgid abc $serve_command
