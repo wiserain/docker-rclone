@@ -49,7 +49,7 @@ jobs:
       -
         name: Initial Buildx
         if: env.X_SKIP == 'false'
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: Dockerfile
@@ -88,7 +88,7 @@ jobs:
       -
         name: Buildx and Push
         if: env.X_SKIP == 'false'
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: Dockerfile
@@ -158,7 +158,7 @@ jobs:
       -
         name: Initial Buildx
         if: env.X_SKIP == 'false'
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: Dockerfile
@@ -184,7 +184,7 @@ jobs:
       -
         name: Buildx and Push
         if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: Dockerfile
