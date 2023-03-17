@@ -93,7 +93,7 @@ RUN \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         bc \
-        fuse \
+        fuse3 \
         jq \
         lsof \
         openssl \
