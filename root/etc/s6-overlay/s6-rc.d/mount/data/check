@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bash
 . /usr/local/bin/variables
 
-if ! findmnt $rclone_mountpoint | grep -q fuse.rclone; then
+if ! findmnt "$rclone_mountpoint" | grep -q fuse.rclone; then
     exit 1
 fi
 
@@ -10,7 +10,7 @@ if [[ -n "${RCLONE_REFRESH_ON_MOUNT:-}" ]]; then
     # In case of mounting google drive which includes shortcuts pointing to another drives, 
     # it sometimes fails to refresh some of directories on the first run 
     # and hence may need to be done again.
-    for i in $(seq $RCLONE_REFRESH_ON_MOUNT_REPEAT); do
+    for ((i=1;i<=RCLONE_REFRESH_ON_MOUNT_REPEAT;i++)); do
         sleep 5
         rclone_refresh "$RCLONE_REFRESH_ON_MOUNT"
     done

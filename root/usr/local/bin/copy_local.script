@@ -18,7 +18,7 @@ if [ "$file_ct" = 0 ];then
 fi
 
 humanReadableSize () {
-    numfmt --to=iec $1 --suffix=B --format="%.2f"
+    numfmt --to=iec "$1" --suffix=B --format="%.2f"
 }
 
 pSize=0
@@ -66,13 +66,12 @@ while read -r n; do
     fileSize=$(stat "$n" -c %s)
 
     # Copy file to remote destination[s], retaining path
-    rclone copy "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if rclone copy "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1; then
         pSize=$((pSize + fileSize))
         pCount=$((pCount + 1))
-        logf "$basefile ($(humanReadableSize $fileSize))"
+        logf "$basefile ($(humanReadableSize "$fileSize"))"
     fi
-done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print0 | xargs -0 --no-run-if-empty stat --format '%Y :%y %n' | sort -nr | cut -d: -f2- | awk '{$1=$2=$3=""; print $0}')
+done <<<"$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print0 | xargs -0 --no-run-if-empty stat --format '%Y :%y %n' | sort -nr | cut -d: -f2- | awk '{$1=$2=$3=""; print $0}')"
 
 # final report
 if [[ "${pCount}" -gt "0" ]]; then

@@ -9,7 +9,7 @@ fi
 if [[ ! "${RCLONE_REMOTE_PATH}" == :* ]]; then
     # if not using connection strings for remote path
     until [ -f "${RCLONE_CONFIG}" ]; do
-        echo "Waiting for '"${RCLONE_CONFIG}"'. Retrying in 30s ..."
+        echo "Waiting for '${RCLONE_CONFIG}'. Retrying in 30s ..."
         echo "RUN: docker exec -it <DOCKER_CONTAINER> rclone_setup"
         sleep 30
     done
@@ -21,10 +21,10 @@ if [[ ! "${RCLONE_REMOTE_PATH}" == *:* ]]; then
     exit 1
 fi
 if [[ ! "${RCLONE_REMOTE_PATH}" == :* ]]; then
-    rclone_remote="$(echo $RCLONE_REMOTE_PATH | cut -d: -f1):"
+    rclone_remote="$(echo "$RCLONE_REMOTE_PATH" | cut -d: -f1):"
     if ! rclone listremotes | grep -q "${rclone_remote}"; then
         echo "ERROR: Invalid rclone remote name (${rclone_remote})"
-        echo "ERROR: Available rclone remotes ($(echo $(rclone listremotes) | tr -d '\r'))"
+        echo "ERROR: Available rclone remotes ($(rclone listremotes | xargs))"
         exit 1
     fi
 fi
@@ -43,7 +43,7 @@ for cron in "${!RCLONE_REFRESH_CRON@}"; do
     crons+=("${!cron}")
 done
 ndup=$(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];c++} END {print c}')
-if [ ${#crons[@]} -ne 0 ] && [ ${#crons[@]} -ne $ndup ]; then
+if [ ${#crons[@]} -ne 0 ] && [ ${#crons[@]} -ne "$ndup" ]; then
     echo "*** ERROR: found duplicates in your RCLONE_REFRESH_CRON*"
     while IFS= read -r dup; do
         printf "  - \"%s\" -> " "$dup"
@@ -51,7 +51,7 @@ if [ ${#crons[@]} -ne 0 ] && [ ${#crons[@]} -ne $ndup ]; then
             [ "$dup" = "${!cron}" ] && printf '%s ' "${cron}"
         done
         printf "\n"
-    done <<< $(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];next} 1')
+    done <<< "$(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];next} 1')"
     exit 1
 fi
 

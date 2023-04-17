@@ -18,7 +18,7 @@ if [ "$file_ct" = 0 ];then
 fi
 
 humanReadableSize () {
-    numfmt --to=iec $1 --suffix=B --format="%.2f"
+    numfmt --to=iec "$1" --suffix=B --format="%.2f"
 }
 
 pSize=0
@@ -62,27 +62,26 @@ if [[ ${MOVE_LOCAL_AFTER_DAYS} =~ ^[0-9]+$ ]]; then
         fileSize=$(stat "$n" -c %s)
 
         # Move file to remote destination[s], retaining path
-        rclone move "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
-        if [ $? -eq 0 ]; then
+        if rclone move "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1; then
             pSize=$((pSize + fileSize))
             pCount=$((pCount + 1))
-            logf "+${MOVE_LOCAL_AFTER_DAYS}D $basefile ($(humanReadableSize $fileSize))"
+            logf "+${MOVE_LOCAL_AFTER_DAYS}D $basefile ($(humanReadableSize "$fileSize"))"
         fi
-    done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -mtime +$MOVE_LOCAL_AFTER_DAYS -print)
+    done <<<"$(find /local -type d \( $prune_paths -false \) -prune -o -type f -mtime +$MOVE_LOCAL_AFTER_DAYS -print)"
 fi
 
 # then move exceed files
 if [[ ${MOVE_LOCAL_EXCEEDS_GB} =~ ^[0-9]+$ ]] && [[ ${MOVE_LOCAL_FREEUP_GB} =~ ^[0-9]+$ ]]; then
-    maxSize=$(($MOVE_LOCAL_EXCEEDS_GB * 1000 * 1000 * 1000))
+    maxSize=$((MOVE_LOCAL_EXCEEDS_GB * 1000 * 1000 * 1000))
     currentSize="$(du -sb /local | awk '{print $1}')"
     if [ "$maxSize" -gt "$currentSize" ]; then
         # logf "Current size of $(($currentSize / 1000 / 1000 / 1000)) GB has not exceeded $MOVE_LOCAL_EXCEEDS_GB GB"
         :
     else
-        freeupSize=$(($MOVE_LOCAL_FREEUP_GB * 1000 * 1000 * 1000))
-        freeupMin=$(($currentSize - $maxSize))
+        freeupSize=$((MOVE_LOCAL_FREEUP_GB * 1000 * 1000 * 1000))
+        freeupMin=$((currentSize - maxSize))
         freeupSize=$((freeupSize>freeupMin ? freeupSize : freeupMin))
-        freeupTotal=$(($freeupSize + $pSize))
+        freeupTotal=$((freeupSize + pSize))
 
         while read -r n; do
             if [ "$pSize" -gt "$freeupTotal" ]; then
@@ -120,13 +119,12 @@ if [[ ${MOVE_LOCAL_EXCEEDS_GB} =~ ^[0-9]+$ ]] && [[ ${MOVE_LOCAL_FREEUP_GB} =~ ^
             fileSize=$(stat "$n" -c %s)
 
             # Move file to remote destination[s], retaining path
-            rclone move --config=/config/rclone.conf "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
-            if [ $? -eq 0 ]; then
+            if rclone move --config=/config/rclone.conf "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1; then
                 pSize=$((pSize + fileSize))
                 pCount=$((pCount + 1))
-                logf "+${MOVE_LOCAL_EXCEEDS_GB}GB $basefile ($(humanReadableSize $fileSize))"
+                logf "+${MOVE_LOCAL_EXCEEDS_GB}GB $basefile ($(humanReadableSize "$fileSize"))"
             fi
-        done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print0 | xargs -0 --no-run-if-empty stat --format '%Y :%y %n' | sort -n | cut -d: -f2- | awk '{$1=$2=$3=""; print $0}')
+        done <<<"$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print0 | xargs -0 --no-run-if-empty stat --format '%Y :%y %n' | sort -n | cut -d: -f2- | awk '{$1=$2=$3=""; print $0}')"
     fi
 fi
 
@@ -165,13 +163,12 @@ if [ "${MOVE_LOCAL_ALL}" == "true" ]; then
         fileSize=$(stat "$n" -c %s)
 
         # Move file to remote destination[s], retaining path
-        rclone move --config=/config/rclone.conf "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1
-        if [ $? -eq 0 ]; then
+        if rclone move --config=/config/rclone.conf "$@" "$n" "${rclone_remote_path}${destpath}" >/dev/null 2>&1; then
             pSize=$((pSize + fileSize))
             pCount=$((pCount + 1))
-            logf "$basefile ($(humanReadableSize $fileSize))"
+            logf "$basefile ($(humanReadableSize "$fileSize"))"
         fi
-    done <<<$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print)
+    done <<<"$(find /local -type d \( $prune_paths -false \) -prune -o -type f -print)"
 fi
 
 # cleanup
