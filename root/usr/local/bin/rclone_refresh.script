@@ -1,7 +1,7 @@
 #!/bin/bash
 
 logf() {
-    echo "$(date "$(printenv DATE_FORMAT)") REFRES: $1"
+    echo -e "$(date "$(printenv DATE_FORMAT)") REFRES: $1"
 }
 
 # If script is already running; abort.
@@ -13,8 +13,8 @@ fi
 refresh_cmd_base="rclone rc vfs/refresh --rc-addr 127.0.0.1:5574 --fast-list --timeout 300m"
 
 do_refresh() {
-    $refresh_cmd_base "$@" | jq -r '.result | keys[] as $k | $k + ":" + .[$k]' | \
-        while IFS=: read -r dir result; do
+    $refresh_cmd_base "$@" | jq -r -c '.result | to_entries[] | [.key, .value] | @tsv' | \
+        while IFS=$'\t' read -r dir result; do
             logf "\"${dir}\": $result"
         done
 }
