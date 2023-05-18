@@ -1,6 +1,6 @@
 # docker-rclone
 
-Docker image for [rclone](https://rclone.org/) mount, with
+Docker image for [rclone](https://rclone.org/) mount with
 
 - Ubuntu 22.04
 - pooling filesystem (a choice of mergerfs or unionfs)
@@ -14,7 +14,7 @@ version: '3'
 services:
   rclone:
     container_name: rclone
-    image: wiserain/rclone
+    image: wiserain/rclone                      # or ghcr.io/wiserain/rclone
     restart: always
     network_mode: "bridge"
     volumes:
@@ -146,7 +146,9 @@ If you want to exclude a certain folder from copy, just put an empty `.nocopy` f
 
 #### move_local
 
-In contrast to `copy_local`, `move_local` consists of three consecutive sub-operations. First, it will move old files. If `MOVE_LOCAL_AFTER_DAYS` is set, files older than that days will be moved. Then, it will move files exceed size of `MOVE_LOCAL_EXCEEDS_GB` by the amount of `MOVE_LOCAL_FREEUP_GB`. Finally, it will move the rest of files in `/local` only if `MOVE_LOCAL_ALL=true`. The command and the way to exclude subfolders are almost the same as for `copy_local`.
+In contrast to `copy_local`, `move_local` consists of three consecutive sub-operations. First, it will move old files. If `MOVE_LOCAL_AFTER_DAYS` is set, files older than that days will be moved. Then, it will move files exceed size of `MOVE_LOCAL_EXCEEDS_GB` by the amount of `MOVE_LOCAL_FREEUP_GB`. Finally, it will move the rest of files in `/local` only if `MOVE_LOCAL_ALL=true`. As a cleanup, it will remove empty directories in `/local` unless `KEEP_EMPTY_DIRS=1` is set.
+
+The command and the way to exclude subfolders are almost the same as for `copy_local`, but `.nomove` file in this case.
 
 #### cron - disabled by default
 
