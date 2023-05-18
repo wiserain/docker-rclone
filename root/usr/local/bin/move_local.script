@@ -172,7 +172,7 @@ if [ "${MOVE_LOCAL_ALL}" == "true" ]; then
 fi
 
 # cleanup
-if [ "$(printenv KEEP_EMPTY_DIRS)" -eq "0" ]; then
+if [ "$(printenv KEEP_EMPTY_DIRS)" -ne "1" ]; then
     find /local -mindepth 1 -type d -empty -delete
 fi
 

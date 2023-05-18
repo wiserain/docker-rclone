@@ -128,6 +128,7 @@ ENV \
     RCLONE_REFRESH_ON_MOUNT_REPEAT=1 \
     UFS_USER_OPTS="cow,direct_io,nonempty,auto_cache,sync_read" \
     MFS_USER_OPTS="rw,use_ino,func.getattr=newest,category.action=all,category.create=ff,cache.files=auto-full,dropcacheonclose=true" \
+    KEEP_EMPTY_DIRS=0 \
     DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
 
 VOLUME /config /cache /log /cloud /data /local
