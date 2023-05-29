@@ -98,6 +98,24 @@ Please note that variables only with capital letters are configurable by environ
 | `RCLONE_LOG_FILE`  | to redirect logging to file  |   |
 | `RCLONE_MOUNT_USER_OPTS`  | additioanl arguments will be appended to the basic options in the above command  |   |
 
+### rclone serve
+
+You can serve a folder tree mounted by `rclone mount` using the `RCLONE_SERVE_MODE` environment variable. This auxiliary service allows you to take advantage of cached contents without having to redefine the `--vfs-*` flags.
+
+Here is the internal command for rclone serve
+
+```bash
+rclone serve ${RCLONE_SERVE_MODE} ${rclone_mountpoint} \
+    ${RCLONE_SERVE_ARGS:---use-mmap --addr=:5678}
+```
+
+, where related environment variables are
+
+| ENV  | Description  | Default  |
+|---|---|---|
+| `RCLONE_SERVE_MODE`  | one of `dlna`, `docker`, `ftp`, `http`, `restic`, `sftp`, `webdav` |  |
+| `RCLONE_SERVE_ARGS`  | arguments for `rclone serve` | `--use-mmap --addr=:5678` |
+
 ## [mergerfs](https://github.com/trapexit/mergerfs) or unionfs (optional)
 
 Along with the rclone folder, you can specify one local directory to be mergerfs with by `POOLING_FS=mergerfs`. Internally, it will execute a following command
