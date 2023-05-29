@@ -37,6 +37,17 @@ while findmnt "${rclone_mountpoint}" | grep -q fuse.rclone; do
     sleep 30s
 done
 
+# checking redefined args
+redefined=""
+for opt in $rclone_mount_basic_opts; do
+    opt="${opt%=*}"
+    case "$RCLONE_MOUNT_USER_OPTS" in *$opt*) redefined="$redefined ${opt}";; esac
+done
+if [ -n "${redefined}" ]; then
+    echo "*** ERROR: Some of the arguments you have specified are already built-in. Please remove them from the RCLONE_MOUNT_USER_OPTS environment variable:${redefined}"
+    exit 1
+fi
+
 # checking duplicates in RCLONE_REFRESH_CRON@
 crons=()
 for cron in "${!RCLONE_REFRESH_CRON@}"; do
