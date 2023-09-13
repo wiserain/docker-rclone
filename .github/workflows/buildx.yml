@@ -73,14 +73,14 @@ jobs:
       -
         name: Login to docker.io
         if: env.X_SKIP == 'false'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASS }}
       -
         name: Login to ghcr.io
         if: env.X_SKIP == 'false'
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -169,14 +169,14 @@ jobs:
       -
         name: Login to docker.io
         if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASS }}
       -
         name: Login to ghcr.io
         if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
