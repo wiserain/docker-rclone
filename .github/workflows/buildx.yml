@@ -54,7 +54,7 @@ jobs:
           context: .
           file: Dockerfile
           tags: ${{ env.IMAGE_NAME }}:testing
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
       -
@@ -97,7 +97,7 @@ jobs:
             ${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
           push: true
@@ -163,7 +163,7 @@ jobs:
           context: .
           file: Dockerfile
           tags: ${{ env.IMAGE_NAME }}:testing
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
       -
@@ -193,7 +193,7 @@ jobs:
             ${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-${{ github.event.pull_request.number }}
             ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}
             ghcr.io/${{ env.IMAGE_NAME }}:testing-${{ matrix.rclone-type }}-${{ github.event.pull_request.number }}
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
           push: true
