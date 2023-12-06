@@ -76,15 +76,15 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_PASS }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
         name: Login to ghcr.io
         if: env.X_SKIP == 'false'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Buildx and Push
         if: env.X_SKIP == 'false'
@@ -107,7 +107,7 @@ jobs:
         uses: peter-evans/dockerhub-description@v3
         with:
           username: ${{ env.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_PASS }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.IMAGE_NAME }}
           short-description: ${{ steps.vars.outputs.github_desc }}
       -
@@ -172,15 +172,15 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_PASS }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       -
         name: Login to ghcr.io
         if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Buildx and Push
         if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
