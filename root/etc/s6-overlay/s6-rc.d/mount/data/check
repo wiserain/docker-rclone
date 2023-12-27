@@ -19,7 +19,7 @@ fi
 if [ "$POOLING_FS" = "mergerfs" ]; then
     IFS=" " read -r -a mfs_user_opts <<< "$MFS_USER_OPTS"
 
-    mount_command="mergerfs ${mfs_branches} /data -o ${mfs_basic_opts} -o ${mfs_user_opts}"
+    mount_command="mergerfs ${MFS_BRANCHES} /data -o ${mfs_basic_opts} -o ${mfs_user_opts}"
     echo "*** pooling => $mount_command"
     exec $mount_command
 fi
@@ -27,7 +27,7 @@ fi
 if [ "$POOLING_FS" = "unionfs" ]; then
     IFS=" " read -r -a ufs_user_opts <<< "$UFS_USER_OPTS"
 
-    mount_command="unionfs ${ufs_branches} /data -o ${ufs_basic_opts} -o ${ufs_user_opts}"
+    mount_command="unionfs ${UFS_BRANCHES} /data -o ${ufs_basic_opts} -o ${ufs_user_opts}"
     echo "*** pooling => $mount_command"
     exec $mount_command
 fi

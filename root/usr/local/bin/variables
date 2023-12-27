@@ -15,7 +15,4 @@ rclone_mount_basic_opts="
 "
 
 mfs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
-mfs_branches="/local=RW:/cloud=NC"
-
 ufs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
-ufs_branches="/local=RW:/cloud=RO"
