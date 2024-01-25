@@ -104,7 +104,7 @@ jobs:
       -
         name: Update Dockerhub description
         if: env.X_SKIP == 'false'
-        uses: peter-evans/dockerhub-description@v3
+        uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
