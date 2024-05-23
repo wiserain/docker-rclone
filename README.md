@@ -2,7 +2,7 @@
 
 Docker image for [rclone](https://rclone.org/) mount with
 
-- Ubuntu 22.04
+- Ubuntu 24.04
 - pooling filesystem (a choice of mergerfs or unionfs)
 - some useful scripts
 
