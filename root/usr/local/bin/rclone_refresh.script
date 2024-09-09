@@ -10,7 +10,7 @@ if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
     exit 3
 fi
 
-refresh_cmd_base="rclone rc vfs/refresh --rc-addr 127.0.0.1:5574 --fast-list --timeout 300m"
+refresh_cmd_base="rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m"
 
 do_refresh() {
     $refresh_cmd_base "$@" | jq -r -c '.result | to_entries[] | [.key, .value] | @tsv' | \
