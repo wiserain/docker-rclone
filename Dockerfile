@@ -80,7 +80,7 @@ RUN \
 # 
 FROM base
 LABEL maintainer="wiserain"
-LABEL org.opencontainers.image.source https://github.com/wiserain/docker-rclone
+LABEL org.opencontainers.image.source=https://github.com/wiserain/docker-rclone
 
 ARG DEBIAN_FRONTEND="noninteractive"
 ARG APT_MIRROR="archive.ubuntu.com"
