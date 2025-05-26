@@ -1,9 +1,13 @@
 #!/usr/bin/with-contenv bash
 . /usr/local/bin/variables
+set -eo pipefail
 
 if ! findmnt "$rclone_mountpoint" | grep -q fuse.rclone; then
     exit 1
 fi
+
+trap run_exit_commands EXIT
+trap 'run_commands "${POST_COMMANDS_FAILURE:-}"; exit 1' ERR
 
 # post-check
 if [[ -n "${RCLONE_REFRESH_ON_MOUNT:-}" ]]; then
@@ -18,18 +22,18 @@ fi
 
 if [ "$POOLING_FS" = "mergerfs" ]; then
     IFS=" " read -r -a mfs_user_opts <<< "$MFS_USER_OPTS"
-
     mount_command="mergerfs ${MFS_BRANCHES} /data -o ${mfs_basic_opts} -o ${mfs_user_opts}"
-    echo "*** pooling => $mount_command"
-    exec $mount_command
-fi
-
-if [ "$POOLING_FS" = "unionfs" ]; then
+elif [ "$POOLING_FS" = "unionfs" ]; then
     IFS=" " read -r -a ufs_user_opts <<< "$UFS_USER_OPTS"
-
     mount_command="unionfs ${UFS_BRANCHES} /data -o ${ufs_basic_opts} -o ${ufs_user_opts}"
-    echo "*** pooling => $mount_command"
-    exec $mount_command
 fi
+
+if [ -n "$mount_command" ]; then
+    echo "*** pooling => $mount_command"
+    $mount_command
+fi
+
+trap - ERR
+run_commands "${POST_COMMANDS_SUCCESS:-}"
 
 exit 0

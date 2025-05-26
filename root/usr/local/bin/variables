@@ -16,3 +16,16 @@ rclone_mount_basic_opts="
 
 mfs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
 ufs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
+
+function run_commands {
+    COMMANDS=$1
+    [ -z "$COMMANDS" ] && return
+    echo "*** executing => $COMMANDS"
+    while IFS= read -r cmd; do echo "$cmd" && eval "$cmd" ; done < <(printf '%s\n' "$COMMANDS")
+}
+
+function run_exit_commands {
+    set +e
+    set +o pipefail
+    run_commands "${POST_COMMANDS_EXIT:-}"
+}
