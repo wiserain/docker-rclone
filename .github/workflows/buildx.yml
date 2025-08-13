@@ -15,7 +15,7 @@ env:
 
 jobs:
   buildx:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     strategy:
       matrix:
@@ -124,7 +124,7 @@ jobs:
             ghcr.io/${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
 
   buildx-on-pr:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     strategy:
       matrix:
