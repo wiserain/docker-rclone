@@ -16,6 +16,8 @@ env:
 jobs:
   buildx:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     if: github.event_name != 'pull_request'
     strategy:
       matrix:
@@ -125,6 +127,8 @@ jobs:
 
   buildx-on-pr:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     if: github.event_name == 'pull_request'
     strategy:
       matrix:
