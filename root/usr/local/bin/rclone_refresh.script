@@ -70,7 +70,14 @@ if [ "${1}" == "." ] || [ "${1}" == "/" ]; then
 else
     logf ">>> refreshing \"$1\""
 
-    IFS="|" read -r -a RDIRS <<< "$1"
+    # replace all newlines with |, then split on |
+    IFS="|" read -r -a raw_dirs <<< "${1//$'\n'/|}"
+
+    RDIRS=()
+    for dir in "${raw_dirs[@]}"; do
+        dir_trimmed="$(echo "$dir" | xargs)"  # remove whitespace
+        [[ -n "$dir_trimmed" ]] && RDIRS+=("$dir_trimmed")
+    done
 
     if [ "${RCLONE_REFRESH_BRACE_EXPANSION}" -eq 1 ]; then
         # applying bash brace expansion for a list of vertical-bar-separated paths
