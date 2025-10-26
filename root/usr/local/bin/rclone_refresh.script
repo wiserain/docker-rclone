@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# setting default values
+: "${RCLONE_REFRESH_METHOD:=default}"
+: "${RCLONE_REFRESH_BRACE_EXPANSION:=0}"
+: "${DATE_FORMAT:="+%Y/%m/%d %H:%M:%S"}"
+
 logf() {
     echo -e "$(date "$(printenv DATE_FORMAT)") REFRES: $1"
 }
