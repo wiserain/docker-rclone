@@ -66,13 +66,6 @@ if [ ${#crons[@]} -ne 0 ] && [ ${#crons[@]} -ne "$ndup" ]; then
     exit 1
 fi
 
-# ensure RCLONE_REFRESH_ON_MOUNT_REPEAT is unsigned integer
-is_uint() { case $1 in ''|*[!0-9]*) return 1;;esac; }
-if ! is_uint "$RCLONE_REFRESH_ON_MOUNT_REPEAT"; then
-    echo "*** ERROR: variable should be unsigned integer: RCLONE_REFRESH_ON_MOUNT_REPEAT=$RCLONE_REFRESH_ON_MOUNT_REPEAT"
-    exit 1
-fi
-
 # permissions
 chown -R abc:abc \
     /config /log /cloud /data
