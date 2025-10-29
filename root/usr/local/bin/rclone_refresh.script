@@ -99,7 +99,7 @@ else
     fi
 fi
 
-etime=$(echo "$(date +%s) - $stime" | bc -l)
+etime=$(( $(date +%s) - stime ))
 hh=$((etime / 3600))
 mm=$(((etime % 3600) / 60))
 ss=$(((etime % 3600) % 60))
