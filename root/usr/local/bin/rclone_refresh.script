@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck shell=bash
 
 # setting default values
 : "${RCLONE_REFRESH_METHOD:=default}"
