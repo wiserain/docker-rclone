@@ -1,5 +1,6 @@
 #!/bin/bash
 # shellcheck shell=bash
+set -euo pipefail
 
 # setting default values
 : "${RCLONE_REFRESH_METHOD:=default}"
