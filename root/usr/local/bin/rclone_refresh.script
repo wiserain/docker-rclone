@@ -22,13 +22,27 @@ if ! flock -n 9; then
     exit 3
 fi
 
-refresh_cmd_base="rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m"
+# -----------------------------------------------------------------------------
+# Refresh logic
+# -----------------------------------------------------------------------------
+refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
 
 do_refresh() {
-    $refresh_cmd_base "$@" | jq -r -c '.result | to_entries[] | [.key, .value] | @tsv' | \
+    local args=("$@")
+    local output
+    if ! output="$("${refresh_cmd_base[@]}" "${args[@]}" 2>&1)"; then
+        logf "rclone rc command failed: $output"
+        return 1
+    fi
+
+    # parse and log result safely
+    if ! jq -r -c 'try (.result | to_entries[] | [.key, .value] | @tsv) catch "parse error"' <<<"$output" 2>/dev/null |
         while IFS=$'\t' read -r dir result; do
-            logf "\"${dir}\": $result"
-        done
+            [[ -n "$dir" ]] && logf "\"${dir}\": ${result}"
+        done; then
+        logf "jq parse failed or invalid rclone output"
+        return 1
+    fi
 }
 
 if [[ $# -lt 1 ]]; then
