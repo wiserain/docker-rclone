@@ -5,9 +5,10 @@
 : "${RCLONE_REFRESH_BRACE_EXPANSION:=0}"
 : "${DATE_FORMAT:="+%Y/%m/%d %H:%M:%S"}"
 
-logf() {
-    echo -e "$(date "$(printenv DATE_FORMAT)") REFRES: $1"
-}
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logf() { echo -e "$(date "$DATE_FORMAT") REFRES: $*"; }
 
 # If script is already running; abort.
 if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
