@@ -10,9 +10,13 @@
 # -----------------------------------------------------------------------------
 logf() { echo -e "$(date "$DATE_FORMAT") REFRES: $*"; }
 
-# If script is already running; abort.
-if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
-    logf "Already in progress. Skipping the refresh of \"$1\""
+# -----------------------------------------------------------------------------
+# Prevent concurrent execution using flock
+# -----------------------------------------------------------------------------
+LOCKFILE="/tmp/$(basename "$0").lock"
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+    logf "Already running. Skipping new refresh request."
     exit 3
 fi
 
