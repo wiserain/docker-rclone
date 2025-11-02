@@ -2,10 +2,16 @@
 # shellcheck shell=bash
 set -euo pipefail
 
-# setting default values
-: "${RCLONE_REFRESH_METHOD:=default}"
-: "${RCLONE_REFRESH_BRACE_EXPANSION:=0}"
+# -----------------------------------------------------------------------------
+# Configuration (environment overrides)
+# -----------------------------------------------------------------------------
+: "${RCLONE_REFRESH_METHOD:=default}"             # default | individual
+: "${RCLONE_REFRESH_BRACE_EXPANSION:=0}"          # 1 = enable brace expansion
 : "${DATE_FORMAT:="+%Y/%m/%d %H:%M:%S"}"
+: "${RCLONE_REFRESH_MAX_RETRIES:=2}"
+: "${RCLONE_REFRESH_RETRY_DELAY:=5}"
+
+[[ -n "${POOLING_FS:-}" ]] && mount_root="/cloud" || mount_root="/data"
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -27,6 +33,12 @@ fi
 # -----------------------------------------------------------------------------
 refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
 
+if findmnt -t fuse.rclone "$mount_root" >/dev/null 2>&1; then
+    check_path=1 # enabled
+else
+    check_path=0
+fi
+
 do_refresh() {
     local args=("$@")
     local output
@@ -43,6 +55,44 @@ do_refresh() {
         logf "jq parse failed or invalid rclone output"
         return 1
     fi
+}
+
+# This function implements a retry loop.
+# When mounting Google Drive (especially with shortcuts to other drives), 
+# rclone's VFS may not immediately reflect all directory contents after the first refresh. 
+# We retry the refresh operation until the directory content is confirmed on the mount path.
+do_refresh_with_retry() {
+    local RDIR
+    RDIR="${1##/}"    # strip all leading /
+    RDIR="${RDIR%%/}" # strip all trailing /
+
+    if [[ "$check_path" -eq 0 ]]; then
+        do_refresh "dir=$RDIR" "recursive=true"
+        return $?
+    fi
+
+    local RETRIES=0
+	local mount_path="${mount_root}/$RDIR"
+
+    while (( RETRIES <= RCLONE_REFRESH_MAX_RETRIES )); do
+        if ! do_refresh "dir=$RDIR" "recursive=true"; then
+            return 1 # no need to retry in this case
+        fi
+
+        # mount check
+        if [ -d "$mount_path" ] && find "$mount_path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+            return 0
+        fi
+
+        RETRIES=$((RETRIES + 1))
+        if (( RETRIES <= RCLONE_REFRESH_MAX_RETRIES )); then
+            logf "\"$RDIR\": No content found in \"$mount_path\". Retrying in ${RCLONE_REFRESH_RETRY_DELAY}s... ($RETRIES/$RCLONE_REFRESH_MAX_RETRIES)"
+            sleep "$RCLONE_REFRESH_RETRY_DELAY"
+        fi
+	done
+
+    logf "\"$RDIR\": Refresh failed after $RCLONE_REFRESH_MAX_RETRIES attempts"
+	return 1 # exceeded maximum retries
 }
 
 # -----------------------------------------------------------------------------
@@ -62,9 +112,9 @@ if [[ "$1" == "." || "$1" == "/" ]]; then
     else
         while read -r RDIR; do
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                do_refresh "dir=$RDIR" "recursive=true"
+                do_refresh_with_retry "$RDIR"
             fi
-        done <<<"$(find /data -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
+        done <<<"$(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
     fi
 else
     logf ">>> refreshing \"$1\""
@@ -102,7 +152,7 @@ else
     else
         for RDIR in "${RDIRS[@]}"; do
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                do_refresh "dir=$RDIR" "recursive=true"
+                do_refresh_with_retry "$RDIR"
             fi
         done
     fi
