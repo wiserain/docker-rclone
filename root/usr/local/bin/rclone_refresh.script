@@ -74,7 +74,7 @@ do_refresh_with_retry() {
     local RETRIES=0
 	local mount_path="${mount_root}/$RDIR"
 
-    while (( RETRIES <= RCLONE_REFRESH_MAX_RETRIES )); do
+    while true; do
         if ! do_refresh "dir=$RDIR" "recursive=true"; then
             return 1 # no need to retry in this case
         fi
@@ -84,15 +84,16 @@ do_refresh_with_retry() {
             return 0
         fi
 
-        RETRIES=$((RETRIES + 1))
-        if (( RETRIES <= RCLONE_REFRESH_MAX_RETRIES )); then
-            logf "\"$RDIR\": No content found in \"$mount_path\". Retrying in ${RCLONE_REFRESH_RETRY_DELAY}s... ($RETRIES/$RCLONE_REFRESH_MAX_RETRIES)"
+        if (( RETRIES < RCLONE_REFRESH_MAX_RETRIES )); then
+            RETRIES=$((RETRIES + 1))
+            logf "\"$RDIR\": But no content found in \"$mount_path\". Retrying in ${RCLONE_REFRESH_RETRY_DELAY}s... ($RETRIES/$RCLONE_REFRESH_MAX_RETRIES)"
             sleep "$RCLONE_REFRESH_RETRY_DELAY"
+        else
+            # 최대 재시도 횟수 초과
+            logf "\"$RDIR\": Refresh failed after $RCLONE_REFRESH_MAX_RETRIES attempts."
+            return 1 # exceeded maximum retries
         fi
 	done
-
-    logf "\"$RDIR\": Refresh failed after $RCLONE_REFRESH_MAX_RETRIES attempts"
-	return 1 # exceeded maximum retries
 }
 
 # -----------------------------------------------------------------------------
@@ -108,11 +109,11 @@ if [[ "$1" == "." || "$1" == "/" ]]; then
     logf ">>> refreshing root"
 
     if [[ "$RCLONE_REFRESH_METHOD" == "default" ]]; then
-        do_refresh "recursive=true"
+        do_refresh "recursive=true" || true
     else
         while read -r RDIR; do
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                do_refresh_with_retry "$RDIR"
+                do_refresh_with_retry "$RDIR" || true
             fi
         done <<<"$(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
     fi
@@ -148,11 +149,11 @@ else
             dirs+=("dir$count=$RDIR")
         done
         dirs+=("recursive=true")
-        do_refresh "${dirs[@]}"
+        do_refresh "${dirs[@]}" || true
     else
         for RDIR in "${RDIRS[@]}"; do
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                do_refresh_with_retry "$RDIR"
+                do_refresh_with_retry "$RDIR" || true
             fi
         done
     fi
