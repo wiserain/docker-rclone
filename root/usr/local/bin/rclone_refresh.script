@@ -16,7 +16,7 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
-logf() { echo -e "$(date "$DATE_FORMAT") REFRES: $*"; }
+logf() { printf '%s REFRES: %s\n' "$(date "$DATE_FORMAT")" "$*"; }
 
 # -----------------------------------------------------------------------------
 # Prevent concurrent execution using flock
@@ -33,7 +33,7 @@ fi
 # -----------------------------------------------------------------------------
 refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
 
-if findmnt -t fuse.rclone "$mount_root" >/dev/null 2>&1; then
+if findmnt -t fuse.rclone "$mount_root" &>/dev/null; then
     check_path=1 # enabled
 else
     check_path=0
@@ -46,29 +46,30 @@ has_content() {
 
 do_refresh() {
     local args=("$@")
-    local output
-    if ! output="$("${refresh_cmd_base[@]}" "${args[@]}" 2>&1)"; then
-        logf "rclone rc command failed: $output"
+    local rc_out
+    if ! rc_out="$("${refresh_cmd_base[@]}" "${args[@]}" 2>&1)"; then
+        logf "rclone rc command failed: $rc_out"
         return 1
     fi
 
     # parse and log result safely
-    if ! jq -r -c 'try (.result | to_entries[] | [.key, .value] | @tsv) catch "parse error"' <<<"$output" 2>/dev/null |
-        while IFS=$'\t' read -r dir result; do
-            [[ -n "$dir" ]] && logf "\"${dir}\": ${result}"
-        done; then
+    local jq_out
+    if ! jq_out=$(jq -r -c 'try (.result | to_entries[] | [.key, .value] | @tsv) catch "parse error"' <<<"$rc_out" 2>/dev/null); then
         logf "jq parse failed or invalid rclone output"
         return 1
     fi
+    while IFS=$'\t' read -r dir result; do
+        [[ -n "$dir" ]] && logf "\"${dir}\": ${result}"
+    done <<<"$jq_out"
 }
 
 # This function implements a retry loop.
 # When mounting Google Drive (especially with shortcuts to other drives), 
 # rclone's VFS may not immediately reflect all directory contents after the first refresh. 
 # We retry the refresh operation until the directory content is confirmed on the mount path.
-do_refresh_with_retry() {
+refresh_with_subdirs_check() {
     local RDIR="${1##/}"    # strip all leading /
-    RDIR="${RDIR%%/}" # strip all trailing /
+    RDIR="${RDIR%%/}"       # strip all trailing /
 
     if [[ "$check_path" -eq 0 ]]; then
         do_refresh "dir=$RDIR" "recursive=true"
@@ -76,20 +77,19 @@ do_refresh_with_retry() {
     fi
 
     local RETRIES=0
-	local mount_path="${mount_root}/$RDIR"
+    local mount_path="${mount_root}/$RDIR"
 
     while true; do
         if ! do_refresh "dir=$RDIR" "recursive=true"; then
             return 1 # no need to retry in this case
         fi
 
-        # mount check
-        if [ -d "$mount_path" ] && has_content "$mount_path"; then
-            # deep refresh
+        # mount check and depth 1 refresh if no content found in subdirs
+        if has_content "$mount_path"; then
             while read -r sub; do
                 if ! has_content "$mount_path/$sub"; then
                     logf "\"$RDIR/$sub\": appears empty - refreshing it"
-                    do_refresh "dir=$RDIR/$sub" || true
+                    do_refresh "dir=$RDIR/$sub" "recursive=true" || true
                 fi
             done <<<"$(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
             return 0
@@ -123,7 +123,7 @@ if [[ "$1" == "." || "$1" == "/" ]]; then
     else
         while read -r RDIR; do
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                do_refresh_with_retry "$RDIR" || true
+                refresh_with_subdirs_check "$RDIR" || true
             fi
         done <<<"$(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
     fi
@@ -163,7 +163,7 @@ else
     else
         for RDIR in "${RDIRS[@]}"; do
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                do_refresh_with_retry "$RDIR" || true
+                refresh_with_subdirs_check "$RDIR" || true
             fi
         done
     fi
