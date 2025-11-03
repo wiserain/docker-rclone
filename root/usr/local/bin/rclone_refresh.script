@@ -32,6 +32,7 @@ fi
 # Refresh logic
 # -----------------------------------------------------------------------------
 refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
+forget_cmd_base=(rclone rc vfs/forget --url 127.0.0.1:5574)
 
 if findmnt -t fuse.rclone "$mount_root" >/dev/null 2>&1; then
     check_path=1 # enabled
@@ -57,13 +58,17 @@ do_refresh() {
     fi
 }
 
+do_forget() {
+    local dir="$1"
+    "${forget_cmd_base[@]}" "dir=$dir" >/dev/null 2>&1 || true
+}
+
 # This function implements a retry loop.
 # When mounting Google Drive (especially with shortcuts to other drives), 
 # rclone's VFS may not immediately reflect all directory contents after the first refresh. 
 # We retry the refresh operation until the directory content is confirmed on the mount path.
 do_refresh_with_retry() {
-    local RDIR
-    RDIR="${1##/}"    # strip all leading /
+    local RDIR="${1##/}"    # strip all leading /
     RDIR="${RDIR%%/}" # strip all trailing /
 
     if [[ "$check_path" -eq 0 ]]; then
@@ -75,6 +80,7 @@ do_refresh_with_retry() {
 	local mount_path="${mount_root}/$RDIR"
 
     while true; do
+        do_forget "$RDIR"
         if ! do_refresh "dir=$RDIR" "recursive=true"; then
             return 1 # no need to retry in this case
         fi
@@ -89,7 +95,6 @@ do_refresh_with_retry() {
             logf "\"$RDIR\": But no content found in \"$mount_path\". Retrying in ${RCLONE_REFRESH_RETRY_DELAY}s... ($RETRIES/$RCLONE_REFRESH_MAX_RETRIES)"
             sleep "$RCLONE_REFRESH_RETRY_DELAY"
         else
-            # 최대 재시도 횟수 초과
             logf "\"$RDIR\": Refresh failed after $RCLONE_REFRESH_MAX_RETRIES attempts."
             return 1 # exceeded maximum retries
         fi
