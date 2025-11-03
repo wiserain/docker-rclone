@@ -32,13 +32,17 @@ fi
 # Refresh logic
 # -----------------------------------------------------------------------------
 refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
-forget_cmd_base=(rclone rc vfs/forget --url 127.0.0.1:5574)
 
 if findmnt -t fuse.rclone "$mount_root" >/dev/null 2>&1; then
     check_path=1 # enabled
 else
     check_path=0
 fi
+
+has_content() {
+    local path="$1"
+    [ -d "$path" ] && find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .
+}
 
 do_refresh() {
     local args=("$@")
@@ -58,11 +62,6 @@ do_refresh() {
     fi
 }
 
-do_forget() {
-    local dir="$1"
-    "${forget_cmd_base[@]}" "dir=$dir" >/dev/null 2>&1 || true
-}
-
 # This function implements a retry loop.
 # When mounting Google Drive (especially with shortcuts to other drives), 
 # rclone's VFS may not immediately reflect all directory contents after the first refresh. 
@@ -80,13 +79,19 @@ do_refresh_with_retry() {
 	local mount_path="${mount_root}/$RDIR"
 
     while true; do
-        do_forget "$RDIR"
         if ! do_refresh "dir=$RDIR" "recursive=true"; then
             return 1 # no need to retry in this case
         fi
 
         # mount check
-        if [ -d "$mount_path" ] && find "$mount_path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .; then
+        if [ -d "$mount_path" ] && has_content "$mount_path"; then
+            # deep refresh
+            subdirs=$(find "$mount_path" -mindepth 1 -maxdepth 1 -type d -printf '%P\n' 2>/dev/null || true)
+            for sub in $subdirs; do
+                if ! has_content "$mount_path/$sub"; then
+                    do_refresh "dir=$RDIR/$sub" || true
+                fi
+            done
             return 0
         fi
 
