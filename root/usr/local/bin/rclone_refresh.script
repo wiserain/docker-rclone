@@ -86,12 +86,12 @@ do_refresh_with_retry() {
         # mount check
         if [ -d "$mount_path" ] && has_content "$mount_path"; then
             # deep refresh
-            subdirs=$(find "$mount_path" -mindepth 1 -maxdepth 1 -type d -printf '%P\n' 2>/dev/null || true)
-            for sub in $subdirs; do
+            while read -r sub; do
                 if ! has_content "$mount_path/$sub"; then
+                    logf "\"$RDIR/$sub\": appears empty - refreshing it"
                     do_refresh "dir=$RDIR/$sub" || true
                 fi
-            done
+            done <<<"$(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
             return 0
         fi
 
