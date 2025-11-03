@@ -91,7 +91,7 @@ do_refresh_with_retry() {
                     logf "\"$RDIR/$sub\": appears empty - refreshing it"
                     do_refresh "dir=$RDIR/$sub" || true
                 fi
-            done <<<"$(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
+            done <<<"$(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
             return 0
         fi
 
