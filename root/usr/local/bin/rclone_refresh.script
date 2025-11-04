@@ -7,9 +7,8 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 : "${RCLONE_REFRESH_METHOD:=default}"             # default | individual
 : "${RCLONE_REFRESH_BRACE_EXPANSION:=0}"          # 1 = enable brace expansion
+: "${RCLONE_REFRESH_DEEP:=0}"
 : "${DATE_FORMAT:="+%Y/%m/%d %H:%M:%S"}"
-: "${RCLONE_REFRESH_MAX_RETRIES:=2}"
-: "${RCLONE_REFRESH_RETRY_DELAY:=5}"
 
 [[ -n "${POOLING_FS:-}" ]] && mount_root="/cloud" || mount_root="/data"
 
@@ -32,12 +31,6 @@ fi
 # Refresh logic
 # -----------------------------------------------------------------------------
 refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
-
-if findmnt -t fuse.rclone "$mount_root" &>/dev/null; then
-    check_path=1 # enabled
-else
-    check_path=0
-fi
 
 has_content() {
     local path="$1"
@@ -63,48 +56,27 @@ do_refresh() {
     done <<<"$jq_out"
 }
 
-# This function implements a retry loop.
-# When mounting Google Drive (especially with shortcuts to other drives), 
-# rclone's VFS may not immediately reflect all directory contents after the first refresh. 
-# We retry the refresh operation until the directory content is confirmed on the mount path.
-refresh_with_subdirs_check() {
+do_deep_refresh() {
     local RDIR="${1##/}"    # strip all leading /
     RDIR="${RDIR%%/}"       # strip all trailing /
-
-    if [[ "$check_path" -eq 0 ]]; then
-        do_refresh "dir=$RDIR" "recursive=true"
-        return $?
-    fi
-
-    local RETRIES=0
     local mount_path="${mount_root}/$RDIR"
 
-    while true; do
-        if ! do_refresh "dir=$RDIR" "recursive=true"; then
-            return 1 # no need to retry in this case
-        fi
+    if ! do_refresh "dir=$RDIR" "recursive=true"; then
+        return 1
+    fi
 
-        # mount check and depth 1 refresh if no content found in subdirs
-        if has_content "$mount_path"; then
-            while IFS= read -r -d $'\0' subpath; do
-                if ! has_content "$subpath"; then
-                    subdir="$RDIR/$(basename "$subpath")"
-                    logf "\"$subdir\": appears empty - refreshing it"
-                    do_refresh "dir=$subdir" "recursive=true" || true
-                fi
-            done < <(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0)
-            return 0
-        fi
-
-        if (( RETRIES < RCLONE_REFRESH_MAX_RETRIES )); then
-            RETRIES=$((RETRIES + 1))
-            logf "\"$RDIR\": But no content found in \"$mount_path\". Retrying in ${RCLONE_REFRESH_RETRY_DELAY}s... ($RETRIES/$RCLONE_REFRESH_MAX_RETRIES)"
-            sleep "$RCLONE_REFRESH_RETRY_DELAY"
-        else
-            logf "\"$RDIR\": Refresh failed after $RCLONE_REFRESH_MAX_RETRIES attempts."
-            return 1 # exceeded maximum retries
-        fi
-	done
+    # Deep refresh
+    # When mounting Google Drive (especially with shortcuts to other drives), 
+    # rclone's initial recursive refresh fails to populate all sub-directories.
+    if (( RCLONE_REFRESH_DEEP == 1 )) && has_content "$mount_path"; then
+        while IFS= read -r -d $'\0' subpath; do
+            if ! has_content "$subpath"; then
+                subdir="$RDIR/$(basename "$subpath")"
+                logf "\"$subdir\": appears empty - refreshing it"
+                do_refresh "dir=$subdir" "recursive=true" || true
+            fi
+        done < <(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0)
+    fi
 }
 
 # -----------------------------------------------------------------------------
@@ -125,7 +97,7 @@ if [[ "$1" == "." || "$1" == "/" ]]; then
         while IFS= read -r -d $'\0' subpath; do
             RDIR="$(basename "$subpath")"
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                refresh_with_subdirs_check "$RDIR" || true
+                do_refresh "dir=$RDIR" "recursive=true" || true                
             fi
         done < <(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0)
     fi
@@ -165,7 +137,7 @@ else
     else
         for RDIR in "${RDIRS[@]}"; do
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                refresh_with_subdirs_check "$RDIR" || true
+                do_deep_refresh "$RDIR" || true
             fi
         done
     fi
