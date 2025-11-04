@@ -86,12 +86,13 @@ refresh_with_subdirs_check() {
 
         # mount check and depth 1 refresh if no content found in subdirs
         if has_content "$mount_path"; then
-            while read -r sub; do
-                if ! has_content "$mount_path/$sub"; then
-                    logf "\"$RDIR/$sub\": appears empty - refreshing it"
-                    do_refresh "dir=$RDIR/$sub" "recursive=true" || true
+            while IFS= read -r -d $'\0' subpath; do
+                if ! has_content "$subpath"; then
+                    subdir="$RDIR/$(basename "$subpath")"
+                    logf "\"$subdir\": appears empty - refreshing it"
+                    do_refresh "dir=$subdir" "recursive=true" || true
                 fi
-            done <<<"$(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
+            done < <(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0)
             return 0
         fi
 
@@ -121,11 +122,12 @@ if [[ "$1" == "." || "$1" == "/" ]]; then
     if [[ "$RCLONE_REFRESH_METHOD" == "default" ]]; then
         do_refresh "recursive=true" || true
     else
-        while read -r RDIR; do
+        while IFS= read -r -d $'\0' subpath; do
+            RDIR="$(basename "$subpath")"
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
                 refresh_with_subdirs_check "$RDIR" || true
             fi
-        done <<<"$(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
+        done < <(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0)
     fi
 else
     logf ">>> refreshing \"$1\""
@@ -136,7 +138,7 @@ else
     RDIRS=()
     for dir in "${raw_dirs[@]}"; do
         dir_trimmed="$(echo "$dir" | xargs)"  # remove whitespace
-        [[ -n "$dir_trimmed" ]] && RDIRS+=("$dir_trimmed")
+        [[ -n "$dir_trimmed" ]] && RDIRS+=("$dir")
     done
 
     if (( RCLONE_REFRESH_BRACE_EXPANSION == 1 )); then
