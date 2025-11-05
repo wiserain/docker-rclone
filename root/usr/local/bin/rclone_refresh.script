@@ -91,7 +91,7 @@ stime=$(date +%s)
 if [[ "$1" == "." || "$1" == "/" ]]; then
     logf ">>> refreshing root"
 
-    if [[ "$RCLONE_REFRESH_METHOD" == "default" ]]; then
+    if [[ "$RCLONE_REFRESH_METHOD" == "default" || ! -d "$mount_root" ]]; then
         do_refresh "recursive=true" || true
     else
         while IFS= read -r -d $'\0' subpath; do
