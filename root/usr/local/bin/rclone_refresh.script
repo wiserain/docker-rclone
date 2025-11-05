@@ -1,56 +1,105 @@
 #!/bin/bash
+# shellcheck shell=bash
+set -euo pipefail
 
-# setting default values
-: "${RCLONE_REFRESH_METHOD:=default}"
-: "${RCLONE_REFRESH_BRACE_EXPANSION:=0}"
+# -----------------------------------------------------------------------------
+# Configuration (environment overrides)
+# -----------------------------------------------------------------------------
+: "${RCLONE_REFRESH_METHOD:=default}"             # default | individual
+: "${RCLONE_REFRESH_BRACE_EXPANSION:=0}"          # 1 = enable brace expansion
+: "${RCLONE_REFRESH_DEEP:=0}"
 : "${DATE_FORMAT:="+%Y/%m/%d %H:%M:%S"}"
 
-logf() {
-    echo -e "$(date "$(printenv DATE_FORMAT)") REFRES: $1"
-}
+[[ -n "${POOLING_FS:-}" ]] && mount_root="/cloud" || mount_root="/data"
 
-# If script is already running; abort.
-if pidof -o %PPID -x "$(basename "$0")">/dev/null; then
-    logf "Already in progress. Skipping the refresh of \"$1\""
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logf() { printf '%s REFRES: %s\n' "$(date "$DATE_FORMAT")" "$*"; }
+
+# -----------------------------------------------------------------------------
+# Prevent concurrent execution using flock
+# -----------------------------------------------------------------------------
+LOCKFILE="/tmp/$(basename "$0").lock"
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+    logf "Already running. Skipping new refresh request."
     exit 3
 fi
 
-refresh_cmd_base="rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m"
+# -----------------------------------------------------------------------------
+# Refresh logic
+# -----------------------------------------------------------------------------
+refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
 
-do_refresh() {
-    $refresh_cmd_base "$@" | jq -r -c '.result | to_entries[] | [.key, .value] | @tsv' | \
-        while IFS=$'\t' read -r dir result; do
-            logf "\"${dir}\": $result"
-        done
+has_content() {
+    local path="$1"
+    [ -d "$path" ] && find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | read
 }
 
+do_refresh() {
+    local args=("$@")
+    local rc_out
+    if ! rc_out="$("${refresh_cmd_base[@]}" "${args[@]}" 2>&1)"; then
+        logf "rclone rc command failed: $rc_out"
+        return 1
+    fi
+
+    # parse and log result safely
+    local jq_out
+    if ! jq_out=$(jq -r -c 'try (.result | to_entries[] | [.key, .value] | @tsv) catch "parse error"' <<<"$rc_out" 2>/dev/null); then
+        logf "jq parse failed or invalid rclone output"
+        return 1
+    fi
+    while IFS=$'\t' read -r dir result; do
+        [[ -n "$dir" ]] && logf "\"${dir}\": ${result}"
+    done <<<"$jq_out"
+}
+
+do_deep_refresh() {
+    local RDIR="${1##/}"    # strip all leading /
+    RDIR="${RDIR%%/}"       # strip all trailing /
+    local mount_path="${mount_root}/$RDIR"
+
+    if ! do_refresh "dir=$RDIR" "recursive=true"; then
+        return 1
+    fi
+
+    # Deep refresh
+    # When mounting Google Drive (especially with shortcuts to other drives), 
+    # rclone's initial recursive refresh fails to populate all sub-directories.
+    if (( RCLONE_REFRESH_DEEP == 1 )) && has_content "$mount_path"; then
+        while IFS= read -r -d $'\0' subpath; do
+            if ! has_content "$subpath"; then
+                subdir="$RDIR/$(basename "$subpath")"
+                logf "\"$subdir\": appears empty - refreshing it"
+                do_refresh "dir=$subdir" "recursive=true" || true
+            fi
+        done < <(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0)
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Main logic
+# -----------------------------------------------------------------------------
 if [[ $# -lt 1 ]]; then
     exit 0
 fi
 
-# 
-# main
-# 
-
-# RCLONE_REFRESH_METHOD
-# 
-# - default: a single RC call for multiple dirs using rclone built-in feature
-# - individual: multiple RC calls, one for each dir
-# 
-
 stime=$(date +%s)
 
-if [ "${1}" == "." ] || [ "${1}" == "/" ]; then
+if [[ "$1" == "." || "$1" == "/" ]]; then
     logf ">>> refreshing root"
 
-    if [ "${RCLONE_REFRESH_METHOD}" == "default" ]; then
-        do_refresh "recursive=true"
+    if [[ "$RCLONE_REFRESH_METHOD" == "default" || ! -d "$mount_root" ]]; then
+        do_refresh "recursive=true" || true
     else
-        while read -r RDIR; do
-            if [ "${RCLONE_REFRESH_METHOD}" == "individual" ]; then
-                do_refresh "dir=$RDIR" "recursive=true"
+        while IFS= read -r -d $'\0' subpath; do
+            RDIR="$(basename "$subpath")"
+            if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
+                do_refresh "dir=$RDIR" "recursive=true" || true
             fi
-        done <<<"$(find /data -maxdepth 1 -mindepth 1 -type d -print0 | xargs -0 --no-run-if-empty -n1 basename)"
+        done < <(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0)
     fi
 else
     logf ">>> refreshing \"$1\""
@@ -61,10 +110,10 @@ else
     RDIRS=()
     for dir in "${raw_dirs[@]}"; do
         dir_trimmed="$(echo "$dir" | xargs)"  # remove whitespace
-        [[ -n "$dir_trimmed" ]] && RDIRS+=("$dir_trimmed")
+        [[ -n "$dir_trimmed" ]] && RDIRS+=("$dir")
     done
 
-    if [ "${RCLONE_REFRESH_BRACE_EXPANSION}" -eq 1 ]; then
+    if (( RCLONE_REFRESH_BRACE_EXPANSION == 1 )); then
         # applying bash brace expansion for a list of vertical-bar-separated paths
         # 1. escape spaces using 'sed -e'
         # 2. apply brace expansion using 'eval printf'
@@ -76,7 +125,7 @@ else
         RDIRS=("${expdirs[@]}")
     fi
 
-    if [ "${RCLONE_REFRESH_METHOD}" == "default" ]; then
+    if [[ "$RCLONE_REFRESH_METHOD" == "default" ]]; then
         count=0
         dirs=()
         for RDIR in "${RDIRS[@]}"; do
@@ -84,17 +133,17 @@ else
             dirs+=("dir$count=$RDIR")
         done
         dirs+=("recursive=true")
-        do_refresh "${dirs[@]}"
+        do_refresh "${dirs[@]}" || true
     else
         for RDIR in "${RDIRS[@]}"; do
-            if [ "${RCLONE_REFRESH_METHOD}" == "individual" ]; then
-                do_refresh "dir=$RDIR" "recursive=true"
+            if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
+                do_deep_refresh "$RDIR" || true
             fi
         done
     fi
 fi
 
-etime=$(echo "$(date +%s) - $stime" | bc -l)
+etime=$(( $(date +%s) - stime ))
 hh=$((etime / 3600))
 mm=$(((etime % 3600) / 60))
 ss=$(((etime % 3600) % 60))

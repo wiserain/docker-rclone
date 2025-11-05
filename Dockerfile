@@ -123,7 +123,6 @@ ENV \
     S6_SERVICES_GRACETIME=5000 \
     S6_KILL_GRACETIME=5000 \
     RCLONE_CONFIG=/config/rclone.conf \
-    RCLONE_REFRESH_ON_MOUNT_REPEAT=1 \
     UFS_BRANCHES="/local=RW:/cloud=RO" \
     MFS_BRANCHES="/local=RW:/cloud=NC" \
     UFS_USER_OPTS="cow,direct_io,nonempty,auto_cache,sync_read" \

@@ -11,13 +11,8 @@ trap 'run_commands "${POST_COMMANDS_FAILURE:-}"; exit 1' ERR
 
 # post-check
 if [[ -n "${RCLONE_REFRESH_ON_MOUNT:-}" ]]; then
-    # In case of mounting google drive which includes shortcuts pointing to another drives, 
-    # it sometimes fails to refresh some of directories on the first run 
-    # and hence may need to be done again.
-    for ((i=1;i<=RCLONE_REFRESH_ON_MOUNT_REPEAT;i++)); do
-        sleep 5
-        rclone_refresh "$RCLONE_REFRESH_ON_MOUNT"
-    done
+    sleep 5
+    rclone_refresh "$RCLONE_REFRESH_ON_MOUNT"
 fi
 
 if [ "$POOLING_FS" = "mergerfs" ]; then
