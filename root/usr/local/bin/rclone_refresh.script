@@ -34,7 +34,7 @@ refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeo
 
 has_content() {
     local path="$1"
-    [ -d "$path" ] && find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q .
+    [ -d "$path" ] && find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | read
 }
 
 do_refresh() {
@@ -97,7 +97,7 @@ if [[ "$1" == "." || "$1" == "/" ]]; then
         while IFS= read -r -d $'\0' subpath; do
             RDIR="$(basename "$subpath")"
             if [[ "$RCLONE_REFRESH_METHOD" == "individual" ]]; then
-                do_refresh "dir=$RDIR" "recursive=true" || true                
+                do_refresh "dir=$RDIR" "recursive=true" || true
             fi
         done < <(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0)
     fi
