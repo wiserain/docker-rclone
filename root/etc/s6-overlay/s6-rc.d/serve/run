@@ -9,6 +9,21 @@ case "$RCLONE_SERVE_MODE" in
         ;;
 esac
 
-serve_command="rclone serve $RCLONE_SERVE_MODE ${rclone_mountpoint} ${RCLONE_SERVE_ARGS:---use-mmap --addr=:5678}"
-echo "*** serving => $serve_command"
-exec s6-setuidgid abc $serve_command
+START_PORT="${RCLONE_SERVE_START_PORT:-5678}"
+CURRENT_PORT=$START_PORT
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    remote="${value%%|*}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    opts="${value##*|}"
+
+    serve_command="rclone serve $RCLONE_SERVE_MODE ${mountpoint} ${RCLONE_SERVE_ARGS:---use-mmap} --addr=:$CURRENT_PORT"
+    echo "*** serving => $serve_command"
+    s6-setuidgid abc $serve_command &
+    
+    CURRENT_PORT=$((CURRENT_PORT + 1))
+done
+
+echo "*** s6: Waiting for all rclone serve processes to finish..."
+
+wait

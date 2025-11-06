@@ -2,9 +2,13 @@
 . /usr/local/bin/variables
 set -eo pipefail
 
-if ! findmnt "$rclone_mountpoint" | grep -q fuse.rclone; then
-    exit 1
-fi
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    if ! findmnt "$mountpoint" | grep -q fuse.rclone; then
+        exit 1
+    fi
+done
 
 trap run_exit_commands EXIT
 trap 'run_commands "${POST_COMMANDS_FAILURE:-}"; exit 1' ERR

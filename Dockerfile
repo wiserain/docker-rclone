@@ -22,7 +22,9 @@ RUN \
     if [ "${RCLONE_TYPE}" = "latest" ]; then \
         rclone_install_script_url="https://rclone.org/install.sh"; \
     elif [ "${RCLONE_TYPE}" = "mod" ]; then \
-        rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"; fi && \
+        rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"; \
+    elif [ "${RCLONE_TYPE}" = "tgdrive" ]; then \
+        rclone_install_script_url="instl.vercel.app/rclone"; fi && \
     curl -fsSL $rclone_install_script_url | bash
 
 # 
@@ -50,7 +52,6 @@ RUN \
     mkdir -p \
         /bar/cache \
         /bar/log \
-        /bar/cloud \
         /bar/data \
         /bar/local \
         && \
@@ -123,14 +124,14 @@ ENV \
     S6_SERVICES_GRACETIME=5000 \
     S6_KILL_GRACETIME=5000 \
     RCLONE_CONFIG=/config/rclone.conf \
-    UFS_BRANCHES="/local=RW:/cloud=RO" \
-    MFS_BRANCHES="/local=RW:/cloud=NC" \
+    UFS_BRANCHES="/local=RW:" \
+    MFS_BRANCHES="/local=RW:" \
     UFS_USER_OPTS="cow,direct_io,nonempty,auto_cache,sync_read" \
     MFS_USER_OPTS="rw,use_ino,func.getattr=newest,category.action=all,category.create=ff,cache.files=auto-full,dropcacheonclose=true" \
     KEEP_EMPTY_DIRS=0 \
     DATE_FORMAT="+%4Y/%m/%d %H:%M:%S"
 
-VOLUME /config /cache /log /cloud /data /local
+VOLUME /config /cache /log /data /local
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
     CMD /usr/local/bin/healthcheck

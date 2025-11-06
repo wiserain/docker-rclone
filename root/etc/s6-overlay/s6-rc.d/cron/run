@@ -1,4 +1,5 @@
 #!/usr/bin/with-contenv bash
+. /usr/local/bin/variables
 
 s6-svwait -U /var/run/service/mount
 
@@ -15,13 +16,31 @@ if [[ -n "${MOVE_LOCAL_CRON:-}" ]]; then
 fi
 
 # any ENVs starting with RCLONE_REFRESH_CRON
-for cron in "${!RCLONE_REFRESH_CRON@}"; do
-    dirs="RCLONE_REFRESH_DIRS${cron//RCLONE_REFRESH_CRON/}"
-    if [[ -n "${!cron}" ]] && [[ -n "${!dirs}" ]]; then
-        echo "*** scheduling job: vfs/refresh for '${!dirs}'"
-        go-cron "${!cron}" /usr/local/bin/rclone_refresh "${!dirs}" &
+while IFS='=' read -r name value; do
+    [[ "$name" =~ ^RCLONE_REFRESH_CRON(_[0-9]+)?(_[A-Za-z0-9]+)?$ ]] || continue
+    remote_num="${BASH_REMATCH[1]}"
+    job_name="${BASH_REMATCH[2]}"
+
+    dirs_var="RCLONE_REFRESH_DIRS${remote_num}${job_name}"
+    remote_key="RCLONE_REMOTE_PATH${remote_num}"
+    
+    if [[ -n "$value" ]] && [[ -n "${!dirs_var:-}" ]] && [[ -n "${RCLONE_PATHS[$remote_key]:-}" ]]; then
+        
+        rc_path_value="${RCLONE_PATHS[$remote_key]}"
+        opts="${rc_path_value##*|}"
+        
+        rc_port=$(echo "$opts" | grep -oP '\-\-rc\-addr=:\K[0-9]+' || true)
+        
+        if [[ -z "$rc_port" ]]; then
+            echo "!!! ERROR: Skipping cron for remote $remote_key. Missing --rc-addr=:PORT in options."
+            continue
+        fi
+        
+        echo "*** scheduling job: vfs/refresh [${job_name}] for '${!dirs_var}' on RC port $rc_port"
+        
+        go-cron "$value" /usr/local/bin/rclone_refresh "${!dirs_var}" "$rc_port" &
         sleep 2
     fi
-done
+done < <(printenv)
 
 exec wait

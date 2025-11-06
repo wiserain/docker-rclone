@@ -10,8 +10,8 @@ on:
   pull_request:
 
 env:
-  DOCKERHUB_USER: wiserain
-  IMAGE_NAME: wiserain/rclone
+  DOCKERHUB_USER: totza2010
+  IMAGE_NAME: totza2010/rclone
 
 jobs:
   buildx:
@@ -21,13 +21,15 @@ jobs:
     if: github.event_name != 'pull_request'
     strategy:
       matrix:
-        rclone-type: [latest, mod]
+        rclone-type: [latest, tgdrive, mod]
     steps:
       -
         name: Check if buildx required
         run: |
           if [ ${{ matrix.rclone-type }} = "latest" ]; then
             rclone_install_script_url="https://rclone.org/install.sh"
+          elif [ ${{ matrix.rclone-type }} = "tgdrive" ]; then
+            rclone_install_script_url="instl.vercel.app/rclone";
           elif [ ${{ matrix.rclone-type }} = "mod" ]; then
             rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"
           fi
@@ -139,6 +141,8 @@ jobs:
         run: |
           if [ ${{ matrix.rclone-type }} = "latest" ]; then
             rclone_install_script_url="https://rclone.org/install.sh"
+          elif [ ${{ matrix.rclone-type }} = "tgdrive" ]; then
+            rclone_install_script_url="instl.vercel.app/rclone";
           elif [ ${{ matrix.rclone-type }} = "mod" ]; then
             rclone_install_script_url="https://raw.githubusercontent.com/wiserain/rclone/mod/install.sh"
           fi
