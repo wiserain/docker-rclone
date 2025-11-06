@@ -18,19 +18,8 @@ set -euo pipefail
 logf() { printf '%s REFRES: %s\n' "$(date "$DATE_FORMAT")" "$*"; }
 
 # -----------------------------------------------------------------------------
-# Prevent concurrent execution using flock
-# -----------------------------------------------------------------------------
-LOCKFILE="/tmp/$(basename "$0").lock"
-exec 9>"$LOCKFILE"
-if ! flock -n 9; then
-    logf "Already running. Skipping new refresh request."
-    exit 3
-fi
-
-# -----------------------------------------------------------------------------
 # Refresh logic
 # -----------------------------------------------------------------------------
-refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
 
 has_content() {
     local path="$1"
@@ -41,18 +30,18 @@ do_refresh() {
     local args=("$@")
     local rc_out
     if ! rc_out="$("${refresh_cmd_base[@]}" "${args[@]}" 2>&1)"; then
-        logf "rclone rc command failed: $rc_out"
+        logf "[RC:$RC_PORT] rclone rc command failed: $rc_out"
         return 1
     fi
 
     # parse and log result safely
     local jq_out
     if ! jq_out=$(jq -r -c 'try (.result | to_entries[] | [.key, .value] | @tsv) catch "parse error"' <<<"$rc_out" 2>/dev/null); then
-        logf "jq parse failed or invalid rclone output"
+        logf "[RC:$RC_PORT] jq parse failed or invalid rclone output"
         return 1
     fi
     while IFS=$'\t' read -r dir result; do
-        [[ -n "$dir" ]] && logf "\"${dir}\": ${result}"
+        [[ -n "$dir" ]] && logf "[RC:$RC_PORT] \"${dir}\": ${result}"
     done <<<"$jq_out"
 }
 
@@ -72,7 +61,7 @@ do_deep_refresh() {
         while IFS= read -r -d $'\0' subpath; do
             if ! has_content "$subpath"; then
                 subdir="$RDIR/$(basename "$subpath")"
-                logf "\"$subdir\": appears empty - refreshing it"
+                logf "[RC:$RC_PORT] \"$subdir\": appears empty - refreshing it"
                 do_refresh "dir=$subdir" "recursive=true" || true
             fi
         done < <(find "$mount_path" -maxdepth 1 -mindepth 1 -type d -print0)
@@ -82,14 +71,26 @@ do_deep_refresh() {
 # -----------------------------------------------------------------------------
 # Main logic
 # -----------------------------------------------------------------------------
-if [[ $# -lt 1 ]]; then
+if [[ $# -lt 2 ]]; then
     exit 0
+fi
+RC_PORT="$2"
+refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:$RC_PORT --fast-list --timeout 300m)
+
+# -----------------------------------------------------------------------------
+# Prevent concurrent execution using flock
+# -----------------------------------------------------------------------------
+LOCKFILE="/tmp/$(basename "$0")_$RC_PORT.lock"
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+    logf "[RC:$RC_PORT] Already running. Skipping new refresh request."
+    exit 3
 fi
 
 stime=$(date +%s)
 
 if [[ "$1" == "." || "$1" == "/" ]]; then
-    logf ">>> refreshing root"
+    logf "[RC:$RC_PORT] >>> refreshing root"
 
     if [[ "$RCLONE_REFRESH_METHOD" == "default" || ! -d "$mount_root" ]]; then
         do_refresh "recursive=true" || true
@@ -102,7 +103,7 @@ if [[ "$1" == "." || "$1" == "/" ]]; then
         done < <(find "$mount_root" -maxdepth 1 -mindepth 1 -type d -print0)
     fi
 else
-    logf ">>> refreshing \"$1\""
+    logf "[RC:$RC_PORT] >>> refreshing \"$1\""
 
     # replace all newlines with |, then split on |
     IFS="|" read -r -a raw_dirs <<< "${1//$'\n'/|}"
@@ -147,4 +148,4 @@ etime=$(( $(date +%s) - stime ))
 hh=$((etime / 3600))
 mm=$(((etime % 3600) / 60))
 ss=$(((etime % 3600) % 60))
-logf "<<< done in $(printf "%02d:%02d:%02d\n" "$hh" "$mm" "$ss")"
+logf "[RC:$RC_PORT] <<< done in $(printf "%02d:%02d:%02d\n" "$hh" "$mm" "$ss")"

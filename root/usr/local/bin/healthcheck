@@ -1,9 +1,14 @@
 #!/usr/bin/with-contenv bash
 . /usr/local/bin/variables
 
-if [ "$(findmnt "${rclone_mountpoint}" | grep fuse.rclone -c)" -ne 1 ]; then
-    exit 1
-fi
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    
+    if [ "$(findmnt "${mountpoint}" | grep fuse.rclone -c)" -ne 1 ]; then
+        exit 1
+    fi
+done
 
 if [ "$POOLING_FS" == "mergerfs" ]; then
     if [ "$(findmnt /data | grep fuse.mergerfs -c)" -ne 1 ]; then

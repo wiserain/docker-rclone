@@ -15,33 +15,108 @@ if [[ ! "${RCLONE_REMOTE_PATH}" == :* ]]; then
     done
 fi
 
-echo "*** checking rclone remote path: ${RCLONE_REMOTE_PATH}"
-if [[ ! "${RCLONE_REMOTE_PATH}" == *:* ]]; then
-    echo "ERROR: Missing colon (:) in RCLONE_REMOTE_PATH (${RCLONE_REMOTE_PATH})"
-    exit 1
-fi
-if [[ ! "${RCLONE_REMOTE_PATH}" == :* ]]; then
-    rclone_remote="$(echo "$RCLONE_REMOTE_PATH" | cut -d: -f1):"
-    if ! rclone listremotes | grep -q "${rclone_remote}"; then
-        echo "ERROR: Invalid rclone remote name (${rclone_remote})"
-        echo "ERROR: Available rclone remotes ($(rclone listremotes | xargs))"
+echo "*** DYNAMIC MOUNTPOINT MANAGEMENT (Cleanup and Creation) ***"
+declare -a EXPECTED_MOUNTPOINTS
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    
+    if [[ -n "$mountpoint" ]]; then
+        EXPECTED_MOUNTPOINTS+=("$mountpoint")
+    fi
+done
+
+for current_dir in /cloud*; do
+    if [[ -d "$current_dir" ]] && [[ "$current_dir" != "/cloud" ]]; then
+        
+        IS_EXPECTED=0
+        for expected_mp in "${EXPECTED_MOUNTPOINTS[@]}"; do
+            if [[ "$current_dir" == "$expected_mp" ]]; then
+                IS_EXPECTED=1
+                break
+            fi
+        done
+        
+        if [[ $IS_EXPECTED -eq 0 ]]; then
+            echo "  - Cleaning up unused mountpoint: $current_dir"
+            rmdir "$current_dir" || echo "    (Note: Could not remove $current_dir, likely not empty)"
+        fi
+    fi
+done
+
+declare -a ALL_DIRS_FOR_CHOWN 
+ALL_DIRS_FOR_CHOWN=("/config" "/log" "/data")
+
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    opts="${value##*|}"
+    
+    if [[ -n "$mountpoint" ]] && [[ ! -d "$mountpoint" ]]; then
+        echo "  - Creating required mountpoint: $mountpoint"
+        mkdir -p "$mountpoint"
+    fi
+    if [[ -n "$mountpoint" ]]; then
+        ALL_DIRS_FOR_CHOWN+=("$mountpoint")
+    fi
+
+    cache_dir=$(echo "$opts" | grep -oP '\-\-cache\-dir=\K[^ ]+' || true)
+    if [[ -n "$cache_dir" ]] && [[ ! -d "$cache_dir" ]]; then
+        echo "  - Creating required cache directory: $cache_dir"
+        mkdir -p "$cache_dir"
+    fi
+    if [[ -n "$cache_dir" ]]; then
+        ALL_DIRS_FOR_CHOWN+=("$cache_dir")
+    fi
+done
+
+echo "*** checking rclone ${#RCLONE_PATHS[@]} remote(s):"
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    remote="${value%%|*}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    opts="${value##*|}"
+    echo " - ${key} → ${remote} to ${mountpoint} with options: $(echo $opts)"
+done
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    remote="${value%%|*}"
+    echo ">>> checking rclone remote path: ${remote}"
+    if [[ ! "${remote}" == *:* ]]; then
+        echo "ERROR: Missing colon (:) in RCLONE_REMOTE_PATH (${remote})"
         exit 1
     fi
-fi
 
-echo "*** checking rclone mountpoint: ${rclone_mountpoint}"
-while findmnt "${rclone_mountpoint}" | grep -q fuse.rclone; do
-    echo "ERROR: rclone mountpoint (${rclone_mountpoint}) already mounted"
-    fusermount -uz "${rclone_mountpoint}"
-    echo "Retrying in 30s ..."
-    sleep 30s
+    if [[ ! "${remote}" == :* ]]; then
+        rclone_remote="$(echo "$remote" | cut -d: -f1):"
+        if ! rclone listremotes | grep -q "${rclone_remote}"; then
+            echo "ERROR: Invalid rclone remote name (${rclone_remote})"
+            echo "ERROR: Available rclone remotes ($(rclone listremotes | xargs))"
+            exit 1
+        fi
+    fi
+done
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    echo ">>> checking rclone mountpoint: ${mountpoint}"
+    while findmnt "$mountpoint" | grep -q fuse.rclone; do
+        echo "ERROR: rclone mountpoint (${mountpoint}) already mounted"
+        fusermount -uz "$mountpoint"
+        echo "Retrying in 30s ..."
+        sleep 30s
+    done
 done
 
 # checking redefined args
 redefined=""
-for opt in $rclone_mount_basic_opts; do
-    opt="${opt%=*}"
-    case " $RCLONE_MOUNT_USER_OPTS " in *" ${opt}="* | *" ${opt} "* ) redefined="$redefined ${opt}";; esac
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    opts="${value##*|}"
+    for opt in $opts; do
+        opt="${opt%=*}"
+        case " $RCLONE_MOUNT_USER_OPTS " in *" ${opt}="* | *" ${opt} "* ) redefined="$redefined ${opt}";; esac
+    done
 done
 if [ -n "${redefined}" ]; then
     echo "*** ERROR: Some of the arguments you have specified are already built-in. Please remove them from the RCLONE_MOUNT_USER_OPTS environment variable:${redefined}"
@@ -49,17 +124,68 @@ if [ -n "${redefined}" ]; then
 fi
 
 # checking duplicates in RCLONE_REFRESH_CRON@
-crons=()
-for cron in "${!RCLONE_REFRESH_CRON@}"; do
-    crons+=("${!cron}")
-done
+# ----------------------------------------------------------------------
+# DYNAMIC CRON DUPLICATE CHECK (Adapted to original format)
+# ----------------------------------------------------------------------
+declare -a crons # Array เพื่อเก็บ "Cron Value|Remote Index"
+declare -a all_var_names # Array เพื่อเก็บชื่อตัวแปรที่เกี่ยวข้อง
+
+# 1. วนลูปผ่าน Environment Variables เพื่อสร้าง "คีย์ผสม"
+while IFS='=' read -r name value; do
+    # ตรวจสอบเฉพาะตัวแปร RCLONE_REFRESH_CRON*
+    [[ "$name" =~ ^RCLONE_REFRESH_CRON(_[0-9]+)?(_[A-Za-z0-9]+)?$ ]] || continue
+    
+    if [[ -n "$value" ]]; then
+        # ดึง Remote Index
+        remote_num="${BASH_REMATCH[1]}" 
+        index_num="${remote_num#_}" 
+        index_num="${index_num:-1}" # ถ้าว่างเปล่า ให้ใช้ 1
+
+        # สร้างคีย์ผสม (Key): CronValue|RemoteIndex
+        check_key="${value}|${index_num}"
+
+        # เก็บทั้งคีย์และชื่อตัวแปร
+        crons+=("$check_key")
+        all_var_names+=("$name")
+    fi
+done < <(printenv)
+
+
+# 2. ใช้ AWK ตรวจสอบความซ้ำซ้อนในคีย์ผสม
+# ndup คือจำนวนคีย์ที่ไม่ซ้ำกัน
 ndup=$(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];c++} END {print c}')
+
+# 3. ตรวจสอบว่ามีจำนวนซ้ำกันหรือไม่
 if [ ${#crons[@]} -ne 0 ] && [ ${#crons[@]} -ne "$ndup" ]; then
-    echo "*** ERROR: found duplicates in your RCLONE_REFRESH_CRON*"
-    while IFS= read -r dup; do
-        printf "  - \"%s\" -> " "$dup"
-        for cron in "${!RCLONE_REFRESH_CRON@}"; do
-            [ "$dup" = "${!cron}" ] && printf '%s ' "${cron}"
+    echo "*** ERROR: found duplicates in your RCLONE_REFRESH_CRON settings."
+    
+    # 4. ใช้ AWK เดิมเพื่อหาค่าที่ซ้ำซ้อน
+    # AWK นี้จะแสดงเฉพาะค่า (คีย์ผสม) ที่ซ้ำออกมา
+    while IFS= read -r dup_key; do
+        # แยก Cron Value และ Remote Index
+        IFS='|' read -r dup_cron_value dup_remote_index <<< "$dup_key"
+        
+        printf "  - Remote Index %s: \"%s\" is used by -> " "$dup_remote_index" "$dup_cron_value"
+
+        # 5. วนลูปผ่านชื่อตัวแปรทั้งหมดเพื่อหาตัวแปรที่ตรงกับคีย์ซ้ำนี้
+        i=0
+        for name in "${all_var_names[@]}"; do
+            # สร้างคีย์ผสมจากชื่อตัวแปรปัจจุบันเพื่อเปรียบเทียบ
+            current_cron_value="${!name}" # ดึงค่า Cron Expression
+            
+            [[ "$name" =~ ^RCLONE_REFRESH_CRON(_[0-9]+)?(_[A-Za-z0-9]+)?$ ]]
+            current_remote_num="${BASH_REMATCH[1]}" 
+            current_index_num="${current_remote_num#_}" 
+            current_index_num="${current_index_num:-1}" 
+            
+            current_check_key="${current_cron_value}|${current_index_num}"
+
+            # เปรียบเทียบกับคีย์ที่ซ้ำ
+            if [ "$dup_key" = "$current_check_key" ]; then
+                printf '%s ' "$name"
+            fi
+            
+            i=$((i+1))
         done
         printf "\n"
     done <<< "$(printf '%s\n' "${crons[@]}"|awk '!($0 in seen){seen[$0];next} 1')"
@@ -67,8 +193,7 @@ if [ ${#crons[@]} -ne 0 ] && [ ${#crons[@]} -ne "$ndup" ]; then
 fi
 
 # permissions
-chown -R abc:abc \
-    /config /log /cloud /data
+chown -R abc:abc "${ALL_DIRS_FOR_CHOWN[@]}"
 chown abc:abc /cache /local
 
 echo "*** rclone v$(rclone version | head -n1 | cut -f2 -dv) ready!"
