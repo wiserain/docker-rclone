@@ -1,18 +1,63 @@
 #!/usr/bin/with-contenv bash
 
-[[ -n "${POOLING_FS:-}" ]] && rclone_mountpoint="/cloud" || rclone_mountpoint="/data"
+base_mount="/data"
+[[ -n "${POOLING_FS:-}" ]] && base_mount="/cloud"
 
-rclone_mount_basic_opts="
---uid=${PUID:-911}
---gid=${PGID:-911}
---cache-dir=/cache
---use-mmap
---allow-other
---umask=002
---rc
---rc-no-auth
---rc-addr=:5574
-"
+rclone_mountpoint="$base_mount"
+
+declare -gA RCLONE_PATHS
+index=0
+
+while IFS='=' read -r name value; do
+    [[ "$name" =~ ^RCLONE_REMOTE_PATH(_[0-9]+)?$ ]] || continue
+    num="${BASH_REMATCH[1]}"
+    num="${num#_}"
+    mountpoint="${base_mount}${num:+$num}"
+    port=$((5574 + index))
+
+    rclone_mount_basic_opts="\
+        --uid=${PUID:-911} \
+        --gid=${PGID:-911} \
+        --cache-dir=/cache \
+        --use-mmap \
+        --allow-other \
+        --umask=002 \
+        --rc \
+        --rc-no-auth \
+        --rc-addr=:${port}
+    "
+
+    opts="${RCLONE_REMOTE_OPTS[$num]:-$rclone_mount_basic_opts}"
+
+    RCLONE_PATHS["$name"]="${value}|${mountpoint}|${opts}"
+    ((index++))
+done < <(printenv)
+
+if (( index == 0 )) && [[ -n "${RCLONE_REMOTE_PATH:-}" ]]; then
+    rclone_mount_basic_opts="\
+        --uid=${PUID:-911} \
+        --gid=${PGID:-911} \
+        --cache-dir=/cache \
+        --use-mmap \
+        --allow-other \
+        --umask=002 \
+        --rc \
+        --rc-no-auth \
+        --rc-addr=:5574
+    "
+
+    RCLONE_PATHS["RCLONE_REMOTE_PATH"]="${RCLONE_REMOTE_PATH}|${base_mount}|${rclone_mount_basic_opts}"
+fi
+
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    
+    if [[ -n "$mountpoint" ]]; then
+        UFS_BRANCHES+="${mountpoint}=RO:"
+        MFS_BRANCHES+="${mountpoint}=NC:"
+    fi
+done
 
 mfs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"
 ufs_basic_opts="uid=${PUID:-911},gid=${PGID:-911},umask=022,allow_other"

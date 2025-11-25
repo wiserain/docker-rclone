@@ -3,7 +3,38 @@
 
 run_commands "${PRE_COMMANDS:-}"
 
-mount_command="rclone mount ${RCLONE_REMOTE_PATH} ${rclone_mountpoint} $(echo $rclone_mount_basic_opts) $RCLONE_MOUNT_USER_OPTS"
-echo "*** mounting => $mount_command"
-exec s6-notifyoncheck -d -s 3000 \
-    s6-setuidgid abc $mount_command
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    remote="${value%%|*}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    opts="${value##*|}"
+
+    mount_command="rclone mount ${remote} ${mountpoint} $(echo $opts) ${RCLONE_MOUNT_USER_OPTS:-}"
+    echo "*** mounting => $mount_command"
+    
+    s6-setuidgid abc $mount_command &
+done
+
+echo "*** run: waiting for all rclone mounts to be ready before calling check..."
+
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    
+    ATTEMPTS=0
+    until findmnt "$mountpoint" | grep -q fuse.rclone; do
+        if [ $ATTEMPTS -ge 60 ]; then
+            echo "ERROR: Mountpoint $mountpoint failed to appear after 60 seconds." >&2
+            exit 1
+        fi
+        echo "  - RUN: Waiting for mountpoint: $mountpoint (Attempt $ATTEMPTS)..."
+        sleep 1
+        ATTEMPTS=$((ATTEMPTS + 1))
+    done
+    echo "  - RUN: Mountpoint $mountpoint is ready."
+done
+
+echo "*** run: all rclone mounts are ready. Notifying s6 to call check."
+s6-notifyoncheck true &
+
+wait

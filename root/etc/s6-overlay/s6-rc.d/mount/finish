@@ -1,7 +1,15 @@
 #!/usr/bin/with-contenv bash
+. /usr/local/bin/variables
 
 unmount() { if findmnt "$1" | grep -q fuse; then fusermount -uz "$1" ; fi }
 
 # unmount fuse
 unmount /data
-[[ -n "${POOLING_FS:-}" ]] && unmount /cloud
+echo ">>> unmounting rclone mountpoint: /data"
+for key in $(printf '%s\n' "${!RCLONE_PATHS[@]}" | sort -t_ -k4n); do
+    value="${RCLONE_PATHS[$key]}"
+    mountpoint="${value#*|}"; mountpoint="${mountpoint%%|*}"
+    echo ">>> unmounting rclone mountpoint: ${mountpoint}"
+
+    unmount "${mountpoint}"
+done
