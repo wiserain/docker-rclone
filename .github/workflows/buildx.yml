@@ -12,6 +12,7 @@ on:
 env:
   DOCKERHUB_USER: wiserain
   IMAGE_NAME: wiserain/rclone
+  X_SKIP: "true"
 
 jobs:
   buildx:
@@ -71,7 +72,7 @@ jobs:
             --load \
             .
           VER=$(docker run --rm --entrypoint=/usr/bin/rclone ${{ env.IMAGE_NAME }}:testing version | head -n1 | cut -f2 -d'v')
-          echo "APP_VER=$VER" >> $GITHUB_ENV
+          echo "app_ver=$VER" >> $GITHUB_OUTPUT
       -
         name: Login to docker.io
         if: env.X_SKIP == 'false'
@@ -96,9 +97,9 @@ jobs:
           file: Dockerfile
           tags: |
             ${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
+            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
           platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
@@ -121,9 +122,9 @@ jobs:
           status: ${{ job.status }}
           description: |
             ${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
+            ${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
             ghcr.io/${{ env.IMAGE_NAME }}:${{ matrix.rclone-type }}
-            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.APP_VER }}
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.vars.outputs.app_ver }}
 
   buildx-on-pr:
     runs-on: ubuntu-latest
