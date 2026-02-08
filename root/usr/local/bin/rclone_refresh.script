@@ -48,7 +48,7 @@ do_refresh() {
     # parse and log result safely
     local jq_out
     if ! jq_out=$(jq -r -c 'try (.result | to_entries[] | [.key, .value] | @tsv) catch "parse error"' <<<"$rc_out" 2>/dev/null); then
-        logf "jq parse failed or invalid rclone output"
+        logf "jq parse failed or invalid rclone output: ${rc_out}"
         return 1
     fi
     while IFS=$'\t' read -r dir result; do
