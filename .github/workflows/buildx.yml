@@ -48,7 +48,7 @@ jobs:
       -
         name: Set up Buildx
         if: env.X_SKIP == 'false'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       -
         name: Initial Buildx
         if: env.X_SKIP == 'false'
@@ -159,7 +159,7 @@ jobs:
       -
         name: Set up Buildx
         if: env.X_SKIP == 'false'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       -
         name: Initial Buildx
         if: env.X_SKIP == 'false'
