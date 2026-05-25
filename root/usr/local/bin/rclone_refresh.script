@@ -30,7 +30,7 @@ fi
 # -----------------------------------------------------------------------------
 # Refresh logic
 # -----------------------------------------------------------------------------
-refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m)
+refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeout 300m --log-level ERROR)
 
 has_content() {
     local path="$1"
