@@ -34,7 +34,8 @@ refresh_cmd_base=(rclone rc vfs/refresh --url 127.0.0.1:5574 --fast-list --timeo
 
 has_content() {
     local path="$1"
-    [ -d "$path" ] && find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | read
+    [[ -d "$path" ]] || return 1
+    [[ -n "$(find "$path" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]
 }
 
 do_refresh() {
