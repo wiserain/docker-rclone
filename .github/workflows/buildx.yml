@@ -40,7 +40,7 @@ jobs:
       -
         name: Checkout
         if: env.X_SKIP == 'false'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       -
         name: Set up QEMU
         if: env.X_SKIP == 'false'
@@ -151,7 +151,7 @@ jobs:
       -
         name: Checkout
         if: env.X_SKIP == 'false'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       -
         name: Set up QEMU
         if: env.X_SKIP == 'false'
