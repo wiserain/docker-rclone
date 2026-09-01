@@ -60,8 +60,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
+          cache-from: type=gha,scope=rclone-${{ matrix.rclone-type }}
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
       -
-        name: Load Built Image and Get Variables
+        name: Load Image and Get Variables
         if: env.X_SKIP == 'false'
         id: vars
         run: |
@@ -103,6 +106,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
+          cache-to: type=gha,mode=max,scope=rclone-${{ matrix.rclone-type }}
           push: true
       -
         name: Update Dockerhub description
@@ -171,6 +175,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
+          cache-from: type=gha,scope=rclone-${{ matrix.rclone-type }}
+          pull: true
       -
         name: Login to docker.io
         if: env.X_SKIP == 'false' && github.actor == github.event.repository.owner.login
@@ -201,6 +207,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             RCLONE_TYPE=${{ matrix.rclone-type }}
+          cache-to: type=gha,mode=max,scope=rclone-${{ matrix.rclone-type }}
           push: true
       -
         name: Notification
