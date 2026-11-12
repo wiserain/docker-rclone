@@ -6,6 +6,26 @@ FROM ghcr.io/by275/base:ubuntu${UBUNTU_VER} AS base
 # 
 # BUILD
 # 
+FROM base AS unionfs-builder
+
+# unionfs-fuse is no longer packaged in Ubuntu 26.04, so build it against FUSE 3.
+RUN apt-get update -qq && \
+    apt-get install -yq --no-install-recommends \
+        build-essential \
+        cmake \
+        libfuse3-dev \
+        pkg-config
+
+ADD https://github.com/rpodgorny/unionfs-fuse/archive/refs/tags/v3.8.tar.gz /tmp/unionfs-fuse.tar.gz
+
+RUN echo "88482d27a886fefd251af3d5b7123e82b2b5800219e7d61d4f29bfee718bbaac  /tmp/unionfs-fuse.tar.gz" | sha256sum -c - && \
+    mkdir -p /tmp/unionfs-fuse && \
+    tar -xzf /tmp/unionfs-fuse.tar.gz -C /tmp/unionfs-fuse --strip-components=1 && \
+    cmake -S /tmp/unionfs-fuse -B /tmp/unionfs-fuse/build -DWITH_LIBFUSE3=ON -DCMAKE_INSTALL_PREFIX=/usr && \
+    cmake --build /tmp/unionfs-fuse/build --parallel && \
+    DESTDIR=/out cmake --install /tmp/unionfs-fuse/build && \
+    install -D -m 644 /tmp/unionfs-fuse/LICENSE /out/usr/share/doc/unionfs-fuse/copyright
+
 FROM base AS rclone
 
 ARG RCLONE_TYPE="latest"
@@ -41,6 +61,9 @@ COPY --from=prebuilt /go/bin/go-cron /bar/usr/local/bin/
 
 # add rclone
 COPY --from=rclone /usr/bin/rclone /bar/usr/bin/
+
+# add unionfs-fuse
+COPY --from=unionfs-builder /out/ /bar/
 
 # add local files
 COPY root/ /bar/
@@ -84,7 +107,6 @@ RUN \
         jq \
         lsof \
         openssl \
-        unionfs-fuse \
         && \
     sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf && \
     echo "**** add mergerfs ****" && \
